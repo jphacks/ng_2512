@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
-from typing import Iterable, Iterator, List
+from typing import Iterable, Iterator, List, Sequence
 
 from sqlalchemy import (
+    JSON,
     Date,
     DateTime,
     ForeignKey,
@@ -14,6 +15,7 @@ from sqlalchemy import (
     String,
     Text,
     create_engine,
+    delete,
     func,
     or_,
     select,
@@ -31,6 +33,9 @@ engine = create_engine(DATABASE_URL, echo=DATABASE_ECHO, future=True)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
 
+# --- ORM table definitions -------------------------------------------------
+
+
 class Proposal(Base):
     """ORM representation of the proposals table."""
 
@@ -39,7 +44,7 @@ class Proposal(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     title: Mapped[str | None] = mapped_column(String, nullable=True)
     event_date: Mapped[date | None] = mapped_column(Date)
-    location: Mapped[str | None] = mapped_column(String)
+    location: Mapped[str | None] = mapped_column(String, nullable=True)
     creator_id: Mapped[int] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     deadline_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -68,6 +73,29 @@ class UserFriendship(Base):
     status: Mapped[str] = mapped_column(String(length=32))
     requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     responded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ChatGroup(Base):
+    """ORM representation of the chat_groupes table."""
+
+    __tablename__ = "chat_groupes"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    title: Mapped[str] = mapped_column(String)
+    icon_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class ChatMember(Base):
+    """ORM representation of the chat_members table."""
+
+    __tablename__ = "chat_members"
+
+    chat_groupe_id: Mapped[int] = mapped_column(
+        ForeignKey("chat_groupes.id"), primary_key=True
+    )
+    user_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    last_viewed_message_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
 class ChatMessage(Base):
@@ -102,6 +130,55 @@ class Asset(Base):
     storage_key: Mapped[str | None] = mapped_column(String, nullable=True)
 
 
+class Album(Base):
+    """ORM representation of the albums table."""
+
+    __tablename__ = "albums"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    title: Mapped[str] = mapped_column(String)
+    creator_id: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class AlbumSharedUser(Base):
+    """ORM representation of the album_shared_users table."""
+
+    __tablename__ = "album_shared_users"
+
+    album_id: Mapped[int] = mapped_column(ForeignKey("albums.id"), primary_key=True)
+    user_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class AlbumPhoto(Base):
+    """ORM representation of the album_photos table."""
+
+    __tablename__ = "album_photos"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    album_id: Mapped[int] = mapped_column(ForeignKey("albums.id"))
+    photo_url: Mapped[str] = mapped_column(String)
+    captured_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class VLMObservation(Base):
+    """ORM representation of the vlm_observations table."""
+
+    __tablename__ = "vlm_observations"
+
+    observation_id: Mapped[str] = mapped_column(String, primary_key=True)
+    initiator_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    schedule_candidates: Mapped[dict | list | None] = mapped_column(JSON, nullable=True)
+    member_candidates: Mapped[dict | list | None] = mapped_column(JSON, nullable=True)
+    extra_metadata: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+# --- Data transfer helpers -------------------------------------------------
+
+
 @dataclass
 class ProposalParticipantData:
     """Serializable participant payload."""
@@ -133,6 +210,8 @@ class ChatMessageData:
     id: int
     chat_id: int
     sender_id: int
+    sender_name: str
+    sender_icon_url: str | None
     body: str | None
     image_url: str | None
     posted_at: datetime
@@ -146,6 +225,51 @@ class NewChatMessage:
     image: str | None = None
 
 
+@dataclass
+class ChatGroupSummary:
+    """Summary information for a chat group."""
+
+    chat_groupe_id: int
+    title: str
+    icon_url: str | None
+    last_message: str | None
+    last_message_date: datetime | None
+    new_chat_num: int
+
+
+@dataclass
+class AlbumSummary:
+    """Summary information for an album."""
+
+    album_id: int
+    title: str
+    last_uploaded_image_url: str | None
+    image_num: int
+    shared_user_num: int
+
+
+@dataclass
+class AlbumPhotoData:
+    """Album photo payload."""
+
+    image_id: int
+    image_url: str
+    uploaded_at: datetime
+
+
+@dataclass
+class AIProposalSuggestion:
+    """AI proposal suggestion payload."""
+
+    title: str
+    event_date: datetime
+    location: str | None
+    participant_ids: List[int]
+
+
+# --- Session utilities -----------------------------------------------------
+
+
 def get_session() -> Iterator[Session]:
     """FastAPI dependency that yields a SQLAlchemy session."""
     session: Session = SessionLocal()
@@ -153,6 +277,9 @@ def get_session() -> Iterator[Session]:
         yield session
     finally:
         session.close()
+
+
+# --- Notification helpers --------------------------------------------------
 
 
 def count_pending_proposal_invites(session: Session, user_id: int) -> int:
@@ -169,8 +296,7 @@ def count_pending_proposal_invites(session: Session, user_id: int) -> int:
 def count_pending_friend_requests(session: Session, user_id: int) -> int:
     """Return the number of pending friend requests directed to the user."""
     stmt = (
-        select(func.cou+
-        nt())
+        select(func.count())
         .select_from(UserFriendship)
         .where(UserFriendship.friend_user_id == user_id)
         .where(UserFriendship.status == "pending")
@@ -178,16 +304,28 @@ def count_pending_friend_requests(session: Session, user_id: int) -> int:
     return session.scalar(stmt) or 0
 
 
-def count_recent_incoming_messages(session: Session, user_id: int, *, hours: int = 24) -> int:
-    """Return the number of chat messages from others within the recent window."""
-    threshold = datetime.now(timezone.utc) - timedelta(hours=hours)
-    stmt = (
-        select(func.count())
-        .select_from(ChatMessage)
-        .where(ChatMessage.sender_id != user_id)
-        .where(ChatMessage.posted_at >= threshold)
-    )
-    return session.scalar(stmt) or 0
+def count_unread_messages(session: Session, user_id: int) -> int:
+    """Return the total number of unread chat messages for the user."""
+    memberships = session.execute(
+        select(ChatMember.chat_groupe_id, ChatMember.last_viewed_message_id)
+        .where(ChatMember.user_id == user_id)
+    ).all()
+
+    total = 0
+    for chat_id, last_viewed in memberships:
+        stmt = (
+            select(func.count())
+            .select_from(ChatMessage)
+            .where(ChatMessage.chat_id == chat_id)
+            .where(ChatMessage.sender_id != user_id)
+        )
+        if last_viewed is not None:
+            stmt = stmt.where(ChatMessage.id > last_viewed)
+        total += session.scalar(stmt) or 0
+    return total
+
+
+# --- Proposal queries ------------------------------------------------------
 
 
 def fetch_active_proposals(session: Session, user_id: int) -> list[ProposalData]:
@@ -238,6 +376,250 @@ def fetch_active_proposals(session: Session, user_id: int) -> list[ProposalData]
     return list(proposals.values())
 
 
+def create_proposal(
+    session: Session,
+    *,
+    user_id: int,
+    title: str,
+    event_date: datetime,
+    location: str | None,
+    participant_ids: Sequence[int],
+) -> int:
+    """Create a proposal and participant rows."""
+    now = datetime.now(timezone.utc)
+    proposal = Proposal(
+        title=title,
+        event_date=event_date.date(),
+        location=location,
+        creator_id=user_id,
+        created_at=now,
+        deadline_at=None,
+    )
+    session.add(proposal)
+    session.flush()
+
+    participant_set = {pid for pid in participant_ids if pid != user_id}
+
+    # Creator is considered accepted by default
+    session.merge(
+        ProposalParticipant(
+            proposal_id=proposal.id,
+            user_id=user_id,
+            status="accepted",
+            updated_at=now,
+        )
+    )
+
+    for participant_id in participant_set:
+        session.merge(
+            ProposalParticipant(
+                proposal_id=proposal.id,
+                user_id=participant_id,
+                status="invited",
+                updated_at=now,
+            )
+        )
+
+    session.commit()
+    return proposal.id
+
+
+def _parse_datetime(value: object, fallback: datetime) -> datetime:
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, str):
+        try:
+            return datetime.fromisoformat(value)
+        except ValueError:
+            pass
+    return fallback
+
+
+def _parse_participants(raw: object) -> list[int]:
+    if isinstance(raw, list):
+        result: list[int] = []
+        for item in raw:
+            try:
+                result.append(int(item))
+            except (TypeError, ValueError):
+                continue
+        return result
+    if isinstance(raw, dict):
+        return _parse_participants(list(raw.values()))
+    return []
+
+
+def fetch_ai_proposal_suggestion(session: Session, user_id: int) -> AIProposalSuggestion:
+    """Return the latest AI proposal suggestion for the user."""
+    observation = session.execute(
+        select(VLMObservation)
+        .where(VLMObservation.initiator_user_id == user_id)
+        .order_by(VLMObservation.created_at.desc())
+        .limit(1)
+    ).scalar_one_or_none()
+
+    fallback_date = datetime.now(timezone.utc) + timedelta(days=3)
+
+    if observation and observation.schedule_candidates:
+        if isinstance(observation.schedule_candidates, list):
+            candidate = observation.schedule_candidates[0] if observation.schedule_candidates else {}
+        elif isinstance(observation.schedule_candidates, dict):
+            candidate = next(iter(observation.schedule_candidates.values()), {})
+        else:
+            candidate = {}
+        title = candidate.get("title") or "New Gathering"
+        location = candidate.get("location")
+        event_date = _parse_datetime(candidate.get("event_date"), fallback_date)
+        participant_ids = _parse_participants(observation.member_candidates)
+    else:
+        title = "Friendly Meetup"
+        location = "Local Cafe"
+        event_date = fallback_date
+        participant_ids = []
+
+    if not participant_ids:
+        participant_ids = [user_id]
+
+    return AIProposalSuggestion(
+        title=title,
+        event_date=event_date,
+        location=location,
+        participant_ids=participant_ids,
+    )
+
+
+# --- Chat queries ----------------------------------------------------------
+
+
+def fetch_chat_groups(session: Session, user_id: int) -> list[ChatGroupSummary]:
+    """Return chat groups for the user with unread counts."""
+    memberships = session.execute(
+        select(ChatGroup, ChatMember)
+        .join(ChatMember, ChatGroup.id == ChatMember.chat_groupe_id)
+        .where(ChatMember.user_id == user_id)
+    ).all()
+
+    summaries: list[ChatGroupSummary] = []
+    for group, membership in memberships:
+        last_message = session.execute(
+            select(ChatMessage)
+            .where(ChatMessage.chat_id == group.id)
+            .order_by(ChatMessage.posted_at.desc())
+            .limit(1)
+        ).scalar_one_or_none()
+
+        unread_stmt = (
+            select(func.count())
+            .select_from(ChatMessage)
+            .where(ChatMessage.chat_id == group.id)
+            .where(ChatMessage.sender_id != user_id)
+        )
+        if membership.last_viewed_message_id is not None:
+            unread_stmt = unread_stmt.where(
+                ChatMessage.id > membership.last_viewed_message_id
+            )
+        unread = session.scalar(unread_stmt) or 0
+
+        if last_message:
+            if last_message.body:
+                last_content = last_message.body
+            elif last_message.image_url:
+                last_content = "[image]"
+            else:
+                last_content = ""
+            last_date = last_message.posted_at
+        else:
+            last_content = ""
+            last_date = None
+
+        summaries.append(
+            ChatGroupSummary(
+                chat_groupe_id=group.id,
+                title=group.title,
+                icon_url=group.icon_url,
+                last_message=last_content,
+                last_message_date=last_date,
+                new_chat_num=unread,
+            )
+        )
+
+    summaries.sort(
+        key=lambda item: item.last_message_date or datetime.min.replace(tzinfo=timezone.utc),
+        reverse=True,
+    )
+    return summaries
+
+
+def create_chat_group(
+    session: Session,
+    *,
+    title: str,
+    member_ids: Sequence[int],
+    icon_url: str | None = None,
+) -> int:
+    """Create a chat group and attach members."""
+    now = datetime.now(timezone.utc)
+    group = ChatGroup(title=title, icon_url=icon_url, created_at=now)
+    session.add(group)
+    session.flush()
+
+    inserted_members: set[int] = set()
+    for member_id in member_ids:
+        if member_id in inserted_members:
+            continue
+        session.merge(
+            ChatMember(
+                chat_groupe_id=group.id,
+                user_id=member_id,
+                last_viewed_message_id=None,
+            )
+        )
+        inserted_members.add(member_id)
+
+    session.commit()
+    return group.id
+
+
+def fetch_chat_messages(
+    session: Session,
+    *,
+    chat_id: int,
+    oldest_chat_id: int | None,
+    limit: int = 20,
+) -> list[ChatMessageData]:
+    """Return chat messages ordered from newest to oldest."""
+    stmt = (
+        select(ChatMessage, User, Asset)
+        .join(User, ChatMessage.sender_id == User.id)
+        .outerjoin(Asset, User.icon_asset_id == Asset.id)
+        .where(ChatMessage.chat_id == chat_id)
+    )
+    if oldest_chat_id is not None:
+        stmt = stmt.where(ChatMessage.id < oldest_chat_id)
+
+    rows = session.execute(
+        stmt.order_by(ChatMessage.id.desc()).limit(limit)
+    ).all()
+
+    messages: list[ChatMessageData] = []
+    for message, user_obj, asset_obj in rows:
+        messages.append(
+            ChatMessageData(
+                id=message.id,
+                chat_id=message.chat_id,
+                sender_id=message.sender_id,
+                sender_name=user_obj.display_name or "",
+                sender_icon_url=(asset_obj.storage_key if asset_obj else None),
+                body=message.body,
+                image_url=message.image_url,
+                posted_at=message.posted_at,
+            )
+        )
+
+    messages.reverse()
+    return messages
+
+
 def create_chat_messages(
     session: Session,
     chat_id: int,
@@ -246,6 +628,7 @@ def create_chat_messages(
 ) -> list[ChatMessageData]:
     """Persist chat messages and return the created records."""
     created: list[ChatMessageData] = []
+    last_message_id: int | None = None
 
     for payload in messages:
         if not payload.body and not payload.image:
@@ -262,16 +645,234 @@ def create_chat_messages(
         session.add(message)
         session.flush()
 
+        user_obj = session.get(User, sender_id)
+        asset_obj = session.get(Asset, user_obj.icon_asset_id) if user_obj and user_obj.icon_asset_id else None
+
         created.append(
             ChatMessageData(
                 id=message.id,
                 chat_id=message.chat_id,
                 sender_id=message.sender_id,
+                sender_name=user_obj.display_name if user_obj else "",
+                sender_icon_url=asset_obj.storage_key if asset_obj else None,
                 body=message.body,
                 image_url=message.image_url,
                 posted_at=message.posted_at,
             )
         )
+        last_message_id = message.id
+
+    if last_message_id is not None:
+        membership = session.get(ChatMember, (chat_id, sender_id))
+        if membership is None:
+            session.add(
+                ChatMember(
+                    chat_groupe_id=chat_id,
+                    user_id=sender_id,
+                    last_viewed_message_id=last_message_id,
+                )
+            )
+        else:
+            membership.last_viewed_message_id = last_message_id
 
     session.commit()
     return created
+
+
+def add_chat_member(session: Session, chat_id: int, user_id: int) -> None:
+    """Add a user to a chat group if not already a member."""
+    existing = session.get(ChatMember, (chat_id, user_id))
+    if existing is None:
+        session.add(
+            ChatMember(
+                chat_groupe_id=chat_id,
+                user_id=user_id,
+                last_viewed_message_id=None,
+            )
+        )
+        session.commit()
+
+
+# --- Album queries ---------------------------------------------------------
+
+
+def fetch_albums(
+    session: Session,
+    *,
+    user_id: int,
+    oldest_album_id: int | None,
+    limit: int = 10,
+) -> list[AlbumSummary]:
+    """Return accessible albums for the user."""
+    albums_stmt = (
+        select(Album)
+        .outerjoin(AlbumSharedUser, Album.id == AlbumSharedUser.album_id)
+        .where(
+            or_(
+                Album.creator_id == user_id,
+                AlbumSharedUser.user_id == user_id,
+            )
+        )
+        .distinct()
+    )
+    if oldest_album_id is not None:
+        albums_stmt = albums_stmt.where(Album.id < oldest_album_id)
+
+    albums = session.execute(
+        albums_stmt.order_by(Album.created_at.desc()).limit(limit)
+    ).scalars().all()
+
+    summaries: list[AlbumSummary] = []
+    for album in albums:
+        last_photo = session.execute(
+            select(AlbumPhoto)
+            .where(AlbumPhoto.album_id == album.id)
+            .order_by(AlbumPhoto.uploaded_at.desc())
+            .limit(1)
+        ).scalar_one_or_none()
+
+        image_count = session.scalar(
+            select(func.count()).where(AlbumPhoto.album_id == album.id)
+        ) or 0
+        shared_count = session.scalar(
+            select(func.count()).where(AlbumSharedUser.album_id == album.id)
+        ) or 0
+
+        summaries.append(
+            AlbumSummary(
+                album_id=album.id,
+                title=album.title,
+                last_uploaded_image_url=last_photo.photo_url if last_photo else None,
+                image_num=image_count,
+                shared_user_num=shared_count,
+            )
+        )
+
+    return summaries
+
+
+def create_album(session: Session, *, user_id: int, title: str) -> int:
+    """Create an album and return its identifier."""
+    now = datetime.now(timezone.utc)
+    album = Album(title=title, creator_id=user_id, created_at=now)
+    session.add(album)
+    session.flush()
+
+    session.add(
+        AlbumSharedUser(
+            album_id=album.id,
+            user_id=user_id,
+            added_at=now,
+        )
+    )
+    session.commit()
+    return album.id
+
+
+def fetch_album_photos(
+    session: Session,
+    *,
+    album_id: int,
+    user_id: int,
+    oldest_image_id: int | None,
+    limit: int = 30,
+) -> tuple[bool, list[AlbumPhotoData]]:
+    """Return album photos with newest first along with ownership."""
+    album = session.get(Album, album_id)
+    if album is None:
+        raise ValueError("Album not found.")
+
+    stmt = select(AlbumPhoto).where(AlbumPhoto.album_id == album_id)
+    if oldest_image_id is not None:
+        stmt = stmt.where(AlbumPhoto.id < oldest_image_id)
+
+    photos = session.execute(
+        stmt.order_by(AlbumPhoto.id.desc()).limit(limit)
+    ).scalars().all()
+
+    data = [
+        AlbumPhotoData(
+            image_id=photo.id,
+            image_url=photo.photo_url,
+            uploaded_at=photo.uploaded_at,
+        )
+        for photo in photos
+    ]
+
+    return album.creator_id == user_id, data
+
+
+def add_album_photos(
+    session: Session,
+    *,
+    album_id: int,
+    photo_urls: Sequence[str],
+) -> list[AlbumPhotoData]:
+    """Insert new album photos and return their metadata."""
+    now = datetime.now(timezone.utc)
+    created: list[AlbumPhotoData] = []
+    for url in photo_urls:
+        photo = AlbumPhoto(
+            album_id=album_id,
+            photo_url=url,
+            captured_at=None,
+            uploaded_at=now,
+        )
+        session.add(photo)
+        session.flush()
+        created.append(
+            AlbumPhotoData(
+                image_id=photo.id,
+                image_url=photo.photo_url,
+                uploaded_at=photo.uploaded_at,
+            )
+        )
+
+    session.commit()
+    return created
+
+
+def update_album(
+    session: Session,
+    *,
+    album_id: int,
+    title: str,
+    shared_user_ids: Sequence[int],
+) -> None:
+    """Update album metadata and membership."""
+    album = session.get(Album, album_id)
+    if album is None:
+        raise ValueError("Album not found.")
+
+    album.title = title
+
+    current_users = {
+        user_id
+        for user_id in session.execute(
+            select(AlbumSharedUser.user_id).where(AlbumSharedUser.album_id == album_id)
+        ).scalars()
+    }
+
+    desired_users = set(shared_user_ids) | {album.creator_id}
+
+    # Add missing users
+    now = datetime.now(timezone.utc)
+    for user_id in desired_users - current_users:
+        session.add(
+            AlbumSharedUser(
+                album_id=album_id,
+                user_id=user_id,
+                added_at=now,
+            )
+        )
+
+    # Remove users no longer shared (but never remove creator)
+    for user_id in current_users - desired_users:
+        session.execute(
+            delete(AlbumSharedUser).where(
+                AlbumSharedUser.album_id == album_id,
+                AlbumSharedUser.user_id == user_id,
+            )
+        )
+
+    session.commit()
