@@ -17,6 +17,7 @@ import { router } from "expo-router";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import CreateProposalScreen from "../create-proposal";
+import { getUserId } from "@/utils/user-storage";
 
 const { width: screenWidth } = Dimensions.get("window");
 
@@ -134,10 +135,18 @@ export default function ProposalsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [fadeAnim] = useState(new Animated.Value(0));
   const [slideAnim] = useState(new Animated.Value(50));
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
 
   useEffect(() => {
+    // 現在のユーザーIDを取得
+    const getCurrentUser = async () => {
+      const userId = await getUserId();
+      setCurrentUserId(userId);
+    };
+    getCurrentUser();
+
     // エントランスアニメーション
     Animated.parallel([
       Animated.timing(fadeAnim, {
@@ -179,13 +188,15 @@ export default function ProposalsScreen() {
   };
 
   const handleAccept = (proposalId: number) => {
+    if (!currentUserId) return;
+
     setProposals((prev) =>
       prev.map((p) =>
         p.id === proposalId
           ? {
               ...p,
               participants: p.participants.map((participant) =>
-                participant.user_id === 1 // 仮に現在のユーザーのIDを1とする
+                participant.user_id === currentUserId
                   ? { ...participant, status: "accepted" as const }
                   : participant
               ),
@@ -213,7 +224,7 @@ export default function ProposalsScreen() {
 
   // ヘルパー関数: 現在のユーザーが作成者かどうか
   const isCurrentUserCreator = (creatorId: number) => {
-    return creatorId === 1; // 仮に現在のユーザーのIDを1とする
+    return currentUserId !== null && creatorId === currentUserId;
   };
 
   const renderProposalCard = ({
@@ -367,15 +378,17 @@ export default function ProposalsScreen() {
                       <Text style={[styles.infoText, { color: "#4A5565" }]}>
                         {item.participants.length}人
                       </Text>
-                      {getAcceptedCount(item.participants) > 0 && (
-                        <Text
-                          style={[styles.acceptedInfo, { color: "#155DFC" }]}
-                        >
-                          {getAcceptedCount(item.participants)}/
-                          {item.participants.length}
-                          人が承認
-                        </Text>
-                      )}
+                      {/* 自分が作成者の場合のみ承認情報を表示 */}
+                      {isCurrentUserCreator(item.creator_id) &&
+                        getAcceptedCount(item.participants) > 0 && (
+                          <Text
+                            style={[styles.acceptedInfo, { color: "#155DFC" }]}
+                          >
+                            {getAcceptedCount(item.participants)}/
+                            {item.participants.length}
+                            人が承認
+                          </Text>
+                        )}
                     </View>
                   </View>
 
@@ -494,26 +507,26 @@ export default function ProposalsScreen() {
                         .join(", ")}
                     </Text>
                   </View>
-                  <View style={styles.detailRow}>
-                    <View
-                      style={[
-                        styles.iconContainer,
-                        { backgroundColor: colors.warning + "20" },
-                      ]}
-                    >
-                      <IconSymbol
-                        name="person"
-                        size={20}
-                        color={colors.warning}
-                      />
+                  {/* 作成者情報は自分が作成者の場合のみ表示 */}
+                  {isCurrentUserCreator(selectedProposal.creator_id) && (
+                    <View style={styles.detailRow}>
+                      <View
+                        style={[
+                          styles.iconContainer,
+                          { backgroundColor: colors.warning + "20" },
+                        ]}
+                      >
+                        <IconSymbol
+                          name="person"
+                          size={20}
+                          color={colors.warning}
+                        />
+                      </View>
+                      <Text style={[styles.detailText, { color: colors.text }]}>
+                        作成者: あなた
+                      </Text>
                     </View>
-                    <Text style={[styles.detailText, { color: colors.text }]}>
-                      作成者:{" "}
-                      {isCurrentUserCreator(selectedProposal.creator_id)
-                        ? "あなた"
-                        : "友達"}
-                    </Text>
-                  </View>
+                  )}
                 </View>
 
                 {/* Action Buttons and Status */}
@@ -544,6 +557,7 @@ export default function ProposalsScreen() {
                   </View>
                 )}
 
+                {/* 自分が作成者の場合のみ承認・拒否統計を表示 */}
                 {isCurrentUserCreator(selectedProposal.creator_id) && (
                   <View
                     style={[
