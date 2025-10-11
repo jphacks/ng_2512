@@ -118,3 +118,29 @@ CREATE TABLE IF NOT EXISTS theme_suggestions (
   selected_id  BIGINT REFERENCES theme_vocab(id),
   created_at   TIMESTAMPTZ DEFAULT now()
 );
+
+-- =============================================================
+-- FL.1.3 — Journal Entries / Tags
+-- =============================================================
+
+CREATE TABLE IF NOT EXISTS journal_entries (
+  id         BIGSERIAL PRIMARY KEY,
+  user_id    BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  photo_path TEXT NOT NULL,
+  note       TEXT,
+  entry_date DATE NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS journal_entry_tags (
+  entry_id       BIGINT NOT NULL REFERENCES journal_entries(id) ON DELETE CASCADE,
+  tagged_user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  PRIMARY KEY (entry_id, tagged_user_id)
+);
+
+CREATE INDEX IF NOT EXISTS journal_entries_user_entry_date_idx
+  ON journal_entries (user_id, entry_date DESC);
+
+CREATE INDEX IF NOT EXISTS journal_entry_tags_tagged_user_idx
+  ON journal_entry_tags (tagged_user_id);

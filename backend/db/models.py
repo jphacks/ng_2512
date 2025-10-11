@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, String, Text, func
+from sqlalchemy import BigInteger, Boolean, Date, DateTime, ForeignKey, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.database import Base
@@ -196,6 +196,57 @@ class ThemeSuggestion(Base):
     selected_vocab: Mapped[ThemeVocab | None] = relationship(back_populates="suggestions", foreign_keys=[selected_id])
 
 
+class JournalEntry(Base):
+    """User-authored journal entries capturing memorable moments."""
+
+    __tablename__ = "journal_entries"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    photo_path: Mapped[str] = mapped_column(Text, nullable=False)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    entry_date: Mapped[date] = mapped_column(Date, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    tags: Mapped[list["JournalEntryTag"]] = relationship(
+        back_populates="entry",
+        cascade="all, delete-orphan",
+    )
+
+
+class JournalEntryTag(Base):
+    """Mapping of tagged friends associated with a journal entry."""
+
+    __tablename__ = "journal_entry_tags"
+
+    entry_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("journal_entries.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    tagged_user_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+
+    entry: Mapped[JournalEntry] = relationship(back_populates="tags")
+
+
 __all__ = [
     "Asset",
     "ImageEmbedding",
@@ -204,4 +255,6 @@ __all__ = [
     "ThemeVocab",
     "ThemeEmbedding",
     "ThemeSuggestion",
+    "JournalEntry",
+    "JournalEntryTag",
 ]
