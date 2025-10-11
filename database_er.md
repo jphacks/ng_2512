@@ -37,7 +37,7 @@ erDiagram
     ALBUMS ||--o{ ALBUM_PHOTOS : "contains"
     CHAT_GPOUPS ||--o{ CHAT_MESSAGES : "receives"
     CHAT_GPOUPS ||--o{ CHAT_MEMBERS : "receives"
-    CHAT_MEMBERS ||--o| CHAT_MESSAGES
+    CHAT_MEMBERS ||--o| CHAT_MESSAGES : "has"
 
     %% Vision-Language pipelines
     VLM_OBSERVATIONS ||--o{ VLM_DETECTION_ENTITIES : "produces"
@@ -124,16 +124,16 @@ erDiagram
     }
 
     PROPOSAL_PARTICIPANTS {
-        proposal_id int PK,FK
-        user_id int PK,FK
-        status enum - 0:'invited', 1:'accepted'`, 2:'declined'
+        proposal_id int PKFK
+        user_id int PKFK
+        status enum
         updated_at datetime
     }
 
     USER_FRIENDSHIPS {
-        user_id int PK,FK
-        friend_user_id int RK,FK
-        status enum - 0:'none', 1:'recommended', 2:'requested', 3:'accepted', 4:'blocked'
+        user_id int PKFK
+        friend_user_id int RKFK
+        status enum
         updated_at datetime
     }
 
@@ -145,8 +145,8 @@ erDiagram
     }
 
     ALBUM_SHARED_USERS {
-        album_id int PK,FK
-        user_id int PK,FK
+        album_id int PKFK
+        user_id int PKFK
         added_at datetime
     }
 
@@ -154,7 +154,7 @@ erDiagram
         id int PK
         album_id int FK
         photo_url string
-        captured_at? datetime
+        captured_at datetime
         uploaded_at datetime
     }
 
@@ -166,8 +166,8 @@ erDiagram
     }
 
     CHAT_MEMBERS {
-        chat_id int PK,FK
-        user_id int PK,FK
+        chat_id int PKFK
+        user_id int PKFK
         last_view_messate int_FK
     }
 
@@ -176,7 +176,7 @@ erDiagram
         chat_id int FK
         sender_id int FK
         body string
-        image_url? string
+        image_url string
         posted_at datetime
     }
 
