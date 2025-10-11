@@ -65,8 +65,46 @@ def test_models_define_expected_columns():
     face_asset_fk = next(iter(face_embedding.c.asset_id.foreign_keys))
     assert face_asset_fk.column.table.name == "assets"
 
+    journal_entry = models.JournalEntry.__table__
+    assert journal_entry.c.user_id.nullable is False
+    assert journal_entry.c.photo_path.nullable is False
+    assert journal_entry.c.entry_date.nullable is False
+    assert journal_entry.c.created_at.server_default is not None
+    entry_user_fk = next(iter(journal_entry.c.user_id.foreign_keys))
+    assert entry_user_fk.column.table.name == "users"
 
-def test_schema_sql_contains_assets_section():
+    journal_entry_tag = models.JournalEntryTag.__table__
+    assert journal_entry_tag.c.entry_id.nullable is False
+    assert journal_entry_tag.c.tagged_user_id.nullable is False
+    assert set(journal_entry_tag.primary_key.columns.keys()) == {"entry_id", "tagged_user_id"}
+    tag_entry_fk = next(iter(journal_entry_tag.c.entry_id.foreign_keys))
+    assert tag_entry_fk.column.table.name == "journal_entries"
+    tag_user_fk = next(iter(journal_entry_tag.c.tagged_user_id.foreign_keys))
+    assert tag_user_fk.column.table.name == "users"
+
+
+def test_theme_vocab_models_structure():
+    vocab_set = models.ThemeVocabSet.__table__
+    assert vocab_set.c.code.unique
+    assert not vocab_set.c.lang.nullable
+    assert vocab_set.c.is_active.default is not None
+
+    vocab = models.ThemeVocab.__table__
+    fk = next(iter(vocab.c.set_id.foreign_keys))
+    assert fk.column.table.name == "theme_vocab_sets"
+    assert vocab.c.name.nullable is False
+
+    embedding = models.ThemeEmbedding.__table__
+    assert isinstance(embedding.c.embedding.type, Vector)
+    assert embedding.c.embedding.type.dim == 768
+    assert list(embedding.primary_key.columns.keys()) == ["theme_id", "model"]
+
+    suggestion = models.ThemeSuggestion.__table__
+    assert suggestion.c.topk.nullable is False
+    assert suggestion.c.model.nullable is False
+
+
+def test_schema_sql_contains_theme_vocab_section():
     sql_path = Path("backend/db/schema.sql")
     sql = sql_path.read_text(encoding="utf-8")
 
@@ -74,3 +112,12 @@ def test_schema_sql_contains_assets_section():
     assert "CREATE TABLE IF NOT EXISTS assets" in sql
     assert "CREATE TABLE IF NOT EXISTS image_embeddings" in sql
     assert "CREATE TABLE IF NOT EXISTS face_embeddings" in sql
+    assert "CREATE TABLE IF NOT EXISTS theme_vocab_sets" in sql
+    assert "CREATE TABLE IF NOT EXISTS theme_vocab" in sql
+    assert "CREATE TABLE IF NOT EXISTS theme_embeddings" in sql
+    assert "CREATE TABLE IF NOT EXISTS theme_suggestions" in sql
+    assert "CREATE UNIQUE INDEX IF NOT EXISTS uniq_active_vocab_set_per_lang" in sql
+    assert "CREATE TABLE IF NOT EXISTS journal_entries" in sql
+    assert "CREATE TABLE IF NOT EXISTS journal_entry_tags" in sql
+    assert "CREATE INDEX IF NOT EXISTS journal_entries_user_entry_date_idx" in sql
+    assert "CREATE INDEX IF NOT EXISTS journal_entry_tags_tagged_user_idx" in sql
