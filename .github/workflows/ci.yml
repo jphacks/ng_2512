@@ -24,7 +24,7 @@ jobs:
       - name: Build test image
         run: docker build -f backend/Dockerfile --target test -t $REGISTRY/$IMAGE_REPO/backend:test .
       - name: Run unit tests
-        run: docker run --rm $REGISTRY/$IMAGE_REPO/backend:test
+        run: docker run --rm $REGISTRY/$IMAGE_REPO/backend:test pytest -q backend/tests -m "not integration"
 
   integration:
     runs-on: ubuntu-latest
