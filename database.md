@@ -201,12 +201,11 @@
 
 ### chat_members
 
-| 列         | 型          | 制約・補足                                |
-| ---------- | ----------- | ----------------------------------------- |
-| id         | BIGSERIAL   | 主キー。チャットルームを識別する ID。     |
-| title      | TEXT        | 必須。チャットのタイトル。                |
-| icon_url   | TEXT        | 任意。チャットのアイコン画像 URL。        |
-| created_at | TIMESTAMPTZ | 既定値 `now()` 。チャットルーム作成日時。 |
+| 列                     | 型        | 制約・補足                                                         |
+| ---------------------- | --------- | ------------------------------------------------------------------ |
+| chat_groupe_id         | BIGSERIAL | 複合主キーの一部。`chat_groupes.id` への外部キー。                 |
+| user_id                | BIGSERIAL | 複合主キーの一部。`users.id` への外部キー                          |
+| last_viewed_message_id | BIGSERIAL | 必須。`chat_messages.id` への外部キー。最後に見たメッセージの id。 |
 
 - リレーション: チャット参加ユーザーを管理する場合は別テーブル（例: `chat_member_users`）で `id` を外部キーとして参照させる。
 
@@ -215,7 +214,7 @@
 | 列        | 型          | 制約・補足                                                    |
 | --------- | ----------- | ------------------------------------------------------------- |
 | id        | BIGSERIAL   | 主キー。                                                      |
-| chat_id   | BIGINT      | 必須。`chat_members.id` への外部キー（`ON DELETE CASCADE`）。 |
+| chat_id   | BIGINT      | 必須。`chat_groupes.id` への外部キー（`ON DELETE CASCADE`）。 |
 | sender_id | BIGINT      | 必須。`users.id` への外部キー（`ON DELETE CASCADE`）。        |
 | body      | TEXT        | 任意。チャット本文。                                          |
 | image_url | TEXT        | 任意。添付画像の URL。                                        |
