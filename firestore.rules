@@ -30,6 +30,20 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // Presence/Proposals rules are implemented in FB.2.2/FB.2.3 tasks
+
+    // Presence — user can only write own
+    match /presence/{userId} {
+      // Any signed-in user can read presence
+      allow read: if isSignedIn();
+      // Only the owner can create/update/delete their presence document
+      allow create, update: if isSignedIn() && request.auth.uid == userId &&
+        request.resource.data.keys().hasOnly(['online','lastSeen','typingIn']) &&
+        (request.resource.data.online == null || request.resource.data.online is bool) &&
+        (request.resource.data.lastSeen == null || request.resource.data.lastSeen is timestamp) &&
+        (request.resource.data.typingIn == null || request.resource.data.typingIn is string);
+      allow delete: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Proposals rules are implemented in FB.2.2 task
   }
 }
