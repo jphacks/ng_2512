@@ -70,9 +70,9 @@ def _make_asset(asset_id: str, owner_id: int) -> models.Asset:
     )
 
 
-def _make_vector(seed: float, length: int = 8) -> list[float]:
+def _make_vector(seed: float, length: int = 768) -> list[float]:
     base = seed / 100.0
-    return [base + (i * 0.01) for i in range(length)]
+    return [base + (i * 0.0001) for i in range(length)]
 
 
 class DummyClipClient:
@@ -121,9 +121,16 @@ class DummyFaceClient:
 
 
 class DummyFaceIndex:
-    def __init__(self, candidates: Mapping[int, list[FaceMatchCandidate]]) -> None:
+    def __init__(
+        self,
+        candidates: Mapping[tuple[float, ...], Mapping[int, list[FaceMatchCandidate]]],
+    ) -> None:
         self._candidates = candidates
         self.lookups: list[dict[str, object]] = []
+
+    @staticmethod
+    def _normalise_embedding(values: Sequence[float]) -> tuple[float, ...]:
+        return tuple(round(float(v), 6) for v in values)
 
     def search(
         self,
@@ -133,11 +140,13 @@ class DummyFaceIndex:
         include_user_ids: Iterable[int],
     ) -> Sequence[FaceMatchCandidate]:
         include_set = set(include_user_ids)
-        self.lookups.append({"limit": limit, "include": include_set})
+        key = self._normalise_embedding(query_embedding)
+        self.lookups.append({"limit": limit, "include": include_set, "key": key})
+        user_map = self._candidates.get(key, {})
         matches: list[FaceMatchCandidate] = []
         for user_id in include_set:
-            if user_id in self._candidates:
-                matches.extend(self._candidates[user_id][:limit])
+            if user_id in user_map:
+                matches.extend(user_map[user_id][:limit])
         matches.sort(key=lambda item: item.score, reverse=True)
         return matches[:limit]
 
@@ -223,8 +232,10 @@ def test_match_people_filters_to_friend_ids(session: Session):
     face_client = DummyFaceClient(faces)
     face_index = DummyFaceIndex(
         {
-            101: [FaceMatchCandidate(user_id=101, display_name="Taro", score=0.95)],
-            202: [FaceMatchCandidate(user_id=202, display_name="Hanako", score=0.88)],
+            DummyFaceIndex._normalise_embedding(faces[0].embedding): {
+                101: [FaceMatchCandidate(user_id=101, display_name="Taro", score=0.95)]
+            },
+            DummyFaceIndex._normalise_embedding(faces[1].embedding): {},
         }
     )
     repo = AssetRepository(session, bucket_name="journal-bucket")
