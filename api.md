@@ -99,6 +99,18 @@ last_message_dateが遅い順でソート(最近更新されたグループが�
 ```
 
 ```
+POST
+/api/chat/groupe
+{
+    title: string,
+    member_ids: string[]
+},
+{
+    とくになし
+}
+```
+
+```
 GET
 /api/chat/[groupe_id]
 {
@@ -109,6 +121,7 @@ GET
         chat_id: int,
         sender_id: int,
         sender_name: string,
+        sender_icon_url: string,
         body: string,
         image_url: string,
         posted_at: datetime
@@ -122,7 +135,7 @@ oldest_chat_id以前のチャットを20件ずつ取得
 POST
 /api/chat/[groupe_id]
 {
-    user_id: string
+    user_id: int
 },
 [
     {
@@ -132,3 +145,97 @@ POST
     ...
 ]
 ```
+
+```
+POST
+/api/chat/[groupe_id]/member
+{
+    invite_user_id: int
+},
+{
+    とくになし
+}
+グループにフレンドを追加するエンドポイント
+```
+
+## アルバム
+
+```
+GET
+/api/albam
+{
+    user_id: int,
+    oldest_albam_id: int/null
+},
+[
+    {
+        albam_id: int,
+        title: string,
+        last_uploaded_image_url: string,
+        image_num: int,
+        shared_user_num: int
+    },
+    ...
+]
+新しいアルバムが上に来るように。
+oldest_albam_id以前のチャットを10件ずつ取得。
+```
+
+```
+POST
+/api/albam
+{
+    user_id: int,
+    title: string
+},
+{
+    とくになし
+}
+アルバム作成エンドポイント
+```
+
+```
+GET
+/api/albam/[albam_id]
+{
+    user_id: int,
+    oldest_image_id: int/null
+},
+[
+    {
+        is_creator: boolen  #アルバム作成者かどうかのbool値
+        image_id: int,
+        image_url: string
+    },
+    ...
+]
+新しい写真が上に来るように。
+oldest_image_id以前の写真を30件ずつ取得。
+```
+
+```
+POST
+/api/albam/[albam_id]
+{
+    photo: binary[]
+},
+{
+    とくになし
+}
+アルバムに写真を追加するエンドポイント
+```
+
+```
+UPDATE
+/api/albam/[albam_id]
+{
+    title: string
+    shared_user_ids: string[]
+},
+{
+    とくになし
+}
+アルバム設定を変更するエンドポイント。タイトルを更新するとともにリクエストに含まれているユーザーをalbum_shared_usersに登録し、含まれていないユーザーを削除する
+```
+
+## フレンド
