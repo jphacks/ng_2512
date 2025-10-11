@@ -12,7 +12,9 @@ const tintColorDark = "#FFB3B3"; // より淡いピンク
 export const Colors = {
   light: {
     text: "#2C3E50",
+    textSecondary: "#7F8C8D", // 追加
     background: "#FEFEFE",
+    inputBackground: "#F8F9FA", // 追加
     tint: tintColorLight,
     icon: "#7F8C8D",
     tabIconDefault: "#BDC3C7",
@@ -30,7 +32,9 @@ export const Colors = {
   },
   dark: {
     text: "#ECF0F1",
+    textSecondary: "#95A5A6", // 追加
     background: "#1A1A1A",
+    inputBackground: "#2D3436", // 追加
     tint: tintColorDark,
     icon: "#95A5A6",
     tabIconDefault: "#7F8C8D",
