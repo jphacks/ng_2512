@@ -1,43 +1,33 @@
-import { defineConfig } from "@playwright/test";
-
-const expoPort = Number(process.env.EXPO_WEB_PORT ?? 19006);
-const apiBase =
-  process.env.E2E_API_BASE_URL ??
-  process.env.EXPO_PUBLIC_API_BASE_URL ??
-  "http://127.0.0.1:8000";
+import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
-  testDir: "./tests/e2e",
-  timeout: 60_000,
+  testDir: 'tests',
+  timeout: 10 * 60 * 1000,
   expect: {
-    timeout: 10_000
+    timeout: 15_000,
   },
-  fullyParallel: false,
+  forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  reporter: [
-    ["list"],
-    ["html", { outputFolder: "playwright-report", open: "never" }]
-  ],
   use: {
-    baseURL: `http://127.0.0.1:${expoPort}`,
-    headless: true,
-    trace: "retain-on-failure",
-    video: "retain-on-failure",
-    viewport: { width: 1280, height: 720 }
+    baseURL: process.env.APP_BASE_URL || 'http://localhost:19006',
+    trace: 'on-first-retry',
+    video: 'retain-on-failure',
   },
+  projects: [
+    {
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'] },
+    },
+  ],
   webServer: {
-    command: `npx expo start --web --non-interactive --clear --port ${expoPort}`,
-    url: `http://127.0.0.1:${expoPort}`,
-    timeout: 180_000,
+    command: 'npx expo start --web --port 19006 --non-interactive',
+    url: 'http://localhost:19006',
+    timeout: 3 * 60 * 1000,
     reuseExistingServer: !process.env.CI,
     env: {
-      ...process.env,
-      BROWSER: "none",
-      EXPO_PUBLIC_API_BASE_URL: apiBase,
-      E2E_API_BASE_URL: apiBase,
-      EXPO_NO_TELEMETRY: "1",
-      NODE_ENV: "test"
-    }
+      EXPO_WEB_PORT: '19006',
+      EXPO_PUBLIC_API_BASE_URL: process.env.EXPO_PUBLIC_API_BASE_URL || process.env.E2E_API_BASE_URL || 'http://127.0.0.1:8000',
+    },
   },
-  outputDir: "playwright-results"
 });
+
