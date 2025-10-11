@@ -17,25 +17,9 @@ import { router } from "expo-router";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useUserId } from "@/hooks/use-user-id";
+import { apiClient, withUserId, User } from "@/services/api-client";
 
 const { width: screenWidth } = Dimensions.get("window");
-
-interface Friend {
-  user_id: number;
-  account_id: string;
-  display_name: string;
-  icon_asset_url?: string;
-}
-
-// モックフレンドデータ
-const mockFriends: Friend[] = [
-  { user_id: 1, account_id: "tanaka_taro", display_name: "田中太郎" },
-  { user_id: 2, account_id: "sato_hanako", display_name: "佐藤花子" },
-  { user_id: 3, account_id: "suzuki_ichiro", display_name: "鈴木一郎" },
-  { user_id: 4, account_id: "yamada_mika", display_name: "山田美香" },
-  { user_id: 5, account_id: "takahashi_kenta", display_name: "高橋健太" },
-  { user_id: 6, account_id: "watanabe_sakura", display_name: "渡辺さくら" },
-];
 
 interface CreateProposalProps {
   visible: boolean;
@@ -50,8 +34,37 @@ export default function CreateProposalScreen({
   const [title, setTitle] = useState("");
   const [datetime, setDatetime] = useState("");
   const [location, setLocation] = useState("");
-  const [participant_ids, setParticipantIds] = useState<number[]>([]);
+  const [selectedFriends, setSelectedFriends] = useState<number[]>([]);
+  const [friends, setFriends] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+
+  // フレンド一覧を取得
+  const fetchFriends = async () => {
+    try {
+      const result = await withUserId(async (userId) => {
+        return apiClient.get<any>("/api/friend", { user_id: userId });
+      });
+
+      if (result.data?.friend) {
+        setFriends(result.data.friend);
+      } else {
+        console.error("Failed to fetch friends:", result.error);
+      }
+    } catch (error) {
+      console.error("Error fetching friends:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (visible) {
+      fetchFriends();
+    }
+  }, [visible]);
+
+  const [participant_ids, setParticipantIds] = useState<number[]>([]);
   const [fadeAnim] = useState(new Animated.Value(0));
   const [slideAnim] = useState(new Animated.Value(50));
   const colorScheme = useColorScheme();
@@ -72,7 +85,7 @@ export default function CreateProposalScreen({
     ]).start();
   }, []);
 
-  const filteredFriends = mockFriends.filter((friend) =>
+  const filteredFriends = friends.filter((friend: User) =>
     friend.display_name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -84,7 +97,7 @@ export default function CreateProposalScreen({
     );
   };
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (
       !title.trim() ||
       !datetime.trim() ||
@@ -100,23 +113,36 @@ export default function CreateProposalScreen({
       return;
     }
 
-    Alert.alert("成功", "提案が作成されました！", [
-      {
-        text: "OK",
-        onPress: () => {
-          // ここで実際の作成処理を行う
-          // POST /api/proposal with: user_id, title, event_date, location, participant_ids
-          console.log("提案データ:", {
-            user_id: userId,
-            title,
-            event_date: datetime,
-            location,
-            participant_ids,
-          });
-          onClose();
+    try {
+      const result = await apiClient.post("/api/proposal", {
+        user_id: userId,
+        title: title.trim(),
+        event_date: datetime,
+        location: location.trim(),
+        participant_ids: participant_ids.map((id) => id.toString()),
+      });
+
+      if (result.error) {
+        Alert.alert("エラー", "提案の作成に失敗しました");
+        return;
+      }
+
+      Alert.alert("成功", "提案が作成されました！", [
+        {
+          text: "OK",
+          onPress: () => {
+            setTitle("");
+            setDatetime("");
+            setLocation("");
+            setParticipantIds([]);
+            onClose();
+          },
         },
-      },
-    ]);
+      ]);
+    } catch (error) {
+      console.error("Error creating proposal:", error);
+      Alert.alert("エラー", "提案の作成に失敗しました");
+    }
   };
 
   const closeModal = () => {
@@ -306,7 +332,7 @@ export default function CreateProposalScreen({
                 placeholderTextColor={colors.placeholder}
               />
               <View style={styles.friendsList}>
-                {filteredFriends.map((friend) => (
+                {filteredFriends.map((friend: User) => (
                   <TouchableOpacity
                     key={friend.user_id}
                     style={[
@@ -364,8 +390,8 @@ export default function CreateProposalScreen({
               </Text>
               <View style={styles.selectedFriends}>
                 {participant_ids.map((friendUserId) => {
-                  const friend = mockFriends.find(
-                    (f) => f.user_id === friendUserId
+                  const friend = friends.find(
+                    (f: User) => f.user_id === friendUserId
                   );
                   return (
                     <View key={friendUserId} style={styles.selectedFriend}>

@@ -18,126 +18,42 @@ import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import CreateProposalScreen from "../create-proposal";
 import { getUserId } from "@/utils/user-storage";
+import { apiClient, withUserId, Proposal } from "@/services/api-client";
 
 const { width: screenWidth } = Dimensions.get("window");
 
-interface Participant {
-  user_id: number;
-  account_id: string;
-  status: "pending" | "accepted" | "rejected";
-  display_name: string;
-  icon_asset_url: string;
-}
-
-interface Proposal {
-  id: number;
-  title: string;
-  event_date: string;
-  location: string;
-  creator_id: number;
-  created_at: string;
-  deadline_at: string;
-  participants: Participant[];
-}
-
-// API仕様に合わせたモックデータ
-const mockProposals: Proposal[] = [
-  {
-    id: 1,
-    title: "週末の映画鑑賞",
-    event_date: "2025-10-12T14:00:00Z",
-    location: "新宿の映画館",
-    creator_id: 2,
-    created_at: "2025-10-07T10:00:00Z",
-    deadline_at: "2025-10-11T23:59:59Z",
-    participants: [
-      {
-        user_id: 1,
-        account_id: "tanaka123",
-        status: "pending",
-        display_name: "田中さん",
-        icon_asset_url: "https://picsum.photos/100/100?random=1",
-      },
-      {
-        user_id: 3,
-        account_id: "sato_san",
-        status: "accepted",
-        display_name: "佐藤さん",
-        icon_asset_url: "https://picsum.photos/100/100?random=2",
-      },
-      {
-        user_id: 4,
-        account_id: "suzuki_s",
-        status: "pending",
-        display_name: "鈴木さん",
-        icon_asset_url: "https://picsum.photos/100/100?random=3",
-      },
-    ],
-  },
-  {
-    id: 2,
-    title: "カフェ巡り",
-    event_date: "2025-10-13T15:30:00Z",
-    location: "渋谷エリア",
-    creator_id: 1,
-    created_at: "2025-10-08T09:30:00Z",
-    deadline_at: "2025-10-12T18:00:00Z",
-    participants: [
-      {
-        user_id: 2,
-        account_id: "yamada_y",
-        status: "accepted",
-        display_name: "山田さん",
-        icon_asset_url: "https://picsum.photos/100/100?random=4",
-      },
-      {
-        user_id: 5,
-        account_id: "takahashi_t",
-        status: "pending",
-        display_name: "高橋さん",
-        icon_asset_url: "https://picsum.photos/100/100?random=5",
-      },
-    ],
-  },
-  {
-    id: 3,
-    title: "美術館見学",
-    event_date: "2025-10-14T11:00:00Z",
-    location: "上野美術館",
-    creator_id: 3,
-    created_at: "2025-10-09T14:20:00Z",
-    deadline_at: "2025-10-13T20:00:00Z",
-    participants: [
-      {
-        user_id: 1,
-        account_id: "tanaka123",
-        status: "rejected",
-        display_name: "田中さん",
-        icon_asset_url: "https://picsum.photos/100/100?random=1",
-      },
-      {
-        user_id: 6,
-        account_id: "ito_i",
-        status: "accepted",
-        display_name: "伊藤さん",
-        icon_asset_url: "https://picsum.photos/100/100?random=6",
-      },
-    ],
-  },
-];
-
 export default function ProposalsScreen() {
-  const [proposals, setProposals] = useState(mockProposals);
+  const [proposals, setProposals] = useState<Proposal[]>([]);
   const [selectedProposal, setSelectedProposal] = useState<Proposal | null>(
     null
   );
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [fadeAnim] = useState(new Animated.Value(0));
   const [slideAnim] = useState(new Animated.Value(50));
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
+
+  // 提案データを取得する関数
+  const fetchProposals = async () => {
+    try {
+      const result = await withUserId(async (userId) => {
+        return apiClient.get<Proposal[]>("/api/proposal", { user_id: userId });
+      });
+
+      if (result.data) {
+        setProposals(result.data);
+      } else {
+        console.error("Failed to fetch proposals:", result.error);
+      }
+    } catch (error) {
+      console.error("Error fetching proposals:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     // 現在のユーザーIDを取得
@@ -146,6 +62,9 @@ export default function ProposalsScreen() {
       setCurrentUserId(userId);
     };
     getCurrentUser();
+
+    // 提案データを取得
+    fetchProposals();
 
     // エントランスアニメーション
     Animated.parallel([
@@ -164,10 +83,9 @@ export default function ProposalsScreen() {
 
   const onRefresh = React.useCallback(() => {
     setRefreshing(true);
-    // モックリフレッシュ
-    setTimeout(() => {
+    fetchProposals().finally(() => {
       setRefreshing(false);
-    }, 1000);
+    });
   }, []);
 
   const formatDate = (dateString: string) => {
@@ -187,38 +105,70 @@ export default function ProposalsScreen() {
     return new Date() > expiryDate;
   };
 
-  const handleAccept = (proposalId: number) => {
+  const handleAccept = async (proposalId: number) => {
     if (!currentUserId) return;
 
-    setProposals((prev) =>
-      prev.map((p) =>
-        p.id === proposalId
-          ? {
-              ...p,
-              participants: p.participants.map((participant) =>
-                participant.user_id === currentUserId
-                  ? { ...participant, status: "accepted" as const }
-                  : participant
-              ),
-            }
-          : p
-      )
-    );
-    setSelectedProposal(null);
+    try {
+      const result = await apiClient.update(`/api/proposal/${proposalId}`, {
+        user_id: currentUserId,
+        status: "accepted",
+      });
+
+      if (result.error) {
+        console.error("Failed to accept proposal:", result.error);
+        return;
+      }
+
+      // ローカル状態を更新
+      setProposals((prev: Proposal[]) =>
+        prev.map((p: Proposal) =>
+          p.id === proposalId
+            ? {
+                ...p,
+                participants: p.participants.map((participant) =>
+                  participant.user_id === currentUserId
+                    ? { ...participant, status: "accepted" as const }
+                    : participant
+                ),
+              }
+            : p
+        )
+      );
+      setSelectedProposal(null);
+    } catch (error) {
+      console.error("Error accepting proposal:", error);
+    }
   };
 
-  const handleReject = (proposalId: number) => {
-    setProposals((prev) => prev.filter((p) => p.id !== proposalId));
-    setSelectedProposal(null);
-  };
+  const handleReject = async (proposalId: number) => {
+    if (!currentUserId) return;
 
-  // ヘルパー関数: 承諾数を計算
-  const getAcceptedCount = (participants: Participant[]) => {
+    try {
+      const result = await apiClient.update(`/api/proposal/${proposalId}`, {
+        user_id: currentUserId,
+        status: "rejected",
+      });
+
+      if (result.error) {
+        console.error("Failed to reject proposal:", result.error);
+        return;
+      }
+
+      // ローカル状態から削除
+      setProposals((prev: Proposal[]) =>
+        prev.filter((p: Proposal) => p.id !== proposalId)
+      );
+      setSelectedProposal(null);
+    } catch (error) {
+      console.error("Error rejecting proposal:", error);
+    }
+  }; // ヘルパー関数: 承諾数を計算
+  const getAcceptedCount = (participants: any[]) => {
     return participants.filter((p) => p.status === "accepted").length;
   };
 
   // ヘルパー関数: 拒否数を計算
-  const getRejectedCount = (participants: Participant[]) => {
+  const getRejectedCount = (participants: any[]) => {
     return participants.filter((p) => p.status === "rejected").length;
   };
 
@@ -317,98 +267,113 @@ export default function ProposalsScreen() {
             </View>
           </View>
 
-          {proposals
-            .filter((p) => !isExpired(p))
-            .map((item, index) => (
-              <Animated.View
-                key={item.id}
-                style={[
-                  styles.proposalCard,
-                  {
-                    opacity: fadeAnim,
-                    transform: [
-                      {
-                        translateY: slideAnim.interpolate({
-                          inputRange: [0, 50],
-                          outputRange: [0, 50],
-                        }),
-                      },
-                    ],
-                  },
-                ]}
-              >
-                <TouchableOpacity
-                  onPress={() => setSelectedProposal(item)}
-                  activeOpacity={0.7}
-                  style={styles.cardTouchable}
+          {loading ? (
+            <View style={styles.proposalCard}>
+              <Text style={[styles.proposalTitle, { color: "#1E2939" }]}>
+                読み込み中...
+              </Text>
+            </View>
+          ) : (
+            proposals
+              .filter((p: Proposal) => !isExpired(p))
+              .map((item: Proposal, index: number) => (
+                <Animated.View
+                  key={item.id}
+                  style={[
+                    styles.proposalCard,
+                    {
+                      opacity: fadeAnim,
+                      transform: [
+                        {
+                          translateY: slideAnim.interpolate({
+                            inputRange: [0, 50],
+                            outputRange: [0, 50],
+                          }),
+                        },
+                      ],
+                    },
+                  ]}
                 >
-                  {/* Card Header */}
-                  <View style={styles.cardHeader}>
-                    <Text style={[styles.proposalTitle, { color: "#1E2939" }]}>
-                      {item.title}
-                    </Text>
-                    <View style={styles.statusBadge}>
-                      <Text style={[styles.statusText, { color: "#894B00" }]}>
-                        待機中
+                  <TouchableOpacity
+                    onPress={() => setSelectedProposal(item)}
+                    activeOpacity={0.7}
+                    style={styles.cardTouchable}
+                  >
+                    {/* Card Header */}
+                    <View style={styles.cardHeader}>
+                      <Text
+                        style={[styles.proposalTitle, { color: "#1E2939" }]}
+                      >
+                        {item.title}
                       </Text>
+                      <View style={styles.statusBadge}>
+                        <Text style={[styles.statusText, { color: "#894B00" }]}>
+                          待機中
+                        </Text>
+                      </View>
                     </View>
-                  </View>
 
-                  {/* Card Info */}
-                  <View style={styles.cardInfo}>
-                    <View style={styles.infoRow}>
-                      <IconSymbol name="location" size={16} color="#4A5565" />
-                      <Text style={[styles.infoText, { color: "#4A5565" }]}>
-                        {item.location}
-                      </Text>
+                    {/* Card Info */}
+                    <View style={styles.cardInfo}>
+                      <View style={styles.infoRow}>
+                        <IconSymbol name="location" size={16} color="#4A5565" />
+                        <Text style={[styles.infoText, { color: "#4A5565" }]}>
+                          {item.location}
+                        </Text>
+                      </View>
+                      <View style={styles.infoRow}>
+                        <IconSymbol name="calendar" size={16} color="#4A5565" />
+                        <Text style={[styles.infoText, { color: "#4A5565" }]}>
+                          {formatDate(item.event_date)}
+                        </Text>
+                        {item.participants.length > 1 && (
+                          <Text style={[styles.moreText, { color: "#99A1AF" }]}>
+                            他{item.participants.length - 1}件
+                          </Text>
+                        )}
+                      </View>
+                      <View style={styles.infoRow}>
+                        <IconSymbol name="person.2" size={16} color="#4A5565" />
+                        <Text style={[styles.infoText, { color: "#4A5565" }]}>
+                          {item.participants.length}人
+                        </Text>
+                        {/* 自分が作成者の場合のみ承認情報を表示 */}
+                        {isCurrentUserCreator(item.creator_id) &&
+                          getAcceptedCount(item.participants) > 0 && (
+                            <Text
+                              style={[
+                                styles.acceptedInfo,
+                                { color: "#155DFC" },
+                              ]}
+                            >
+                              {getAcceptedCount(item.participants)}/
+                              {item.participants.length}
+                              人が承認
+                            </Text>
+                          )}
+                      </View>
                     </View>
-                    <View style={styles.infoRow}>
-                      <IconSymbol name="calendar" size={16} color="#4A5565" />
-                      <Text style={[styles.infoText, { color: "#4A5565" }]}>
-                        {formatDate(item.event_date)}
-                      </Text>
-                      {item.participants.length > 1 && (
-                        <Text style={[styles.moreText, { color: "#99A1AF" }]}>
-                          他{item.participants.length - 1}件
+
+                    {/* Card Footer */}
+                    <View style={styles.cardFooter}>
+                      <View style={styles.timeInfo}>
+                        <IconSymbol name="clock" size={12} color="#6A7282" />
+                        <Text style={[styles.timeText, { color: "#6A7282" }]}>
+                          あと5日
+                        </Text>
+                      </View>
+                      {isCurrentUserCreator(item.creator_id) && (
+                        <Text
+                          style={[styles.ownProposal, { color: "#155DFC" }]}
+                        >
+                          自分の提案
                         </Text>
                       )}
                     </View>
-                    <View style={styles.infoRow}>
-                      <IconSymbol name="person.2" size={16} color="#4A5565" />
-                      <Text style={[styles.infoText, { color: "#4A5565" }]}>
-                        {item.participants.length}人
-                      </Text>
-                      {/* 自分が作成者の場合のみ承認情報を表示 */}
-                      {isCurrentUserCreator(item.creator_id) &&
-                        getAcceptedCount(item.participants) > 0 && (
-                          <Text
-                            style={[styles.acceptedInfo, { color: "#155DFC" }]}
-                          >
-                            {getAcceptedCount(item.participants)}/
-                            {item.participants.length}
-                            人が承認
-                          </Text>
-                        )}
-                    </View>
-                  </View>
-
-                  {/* Card Footer */}
-                  <View style={styles.cardFooter}>
-                    <View style={styles.timeInfo}>
-                      <IconSymbol name="clock" size={12} color="#6A7282" />
-                      <Text style={[styles.timeText, { color: "#6A7282" }]}>
-                        あと5日
-                      </Text>
-                    </View>
-                    {isCurrentUserCreator(item.creator_id) && (
-                      <Text style={[styles.ownProposal, { color: "#155DFC" }]}>
-                        自分の提案
-                      </Text>
-                    )}
-                  </View>
-                </TouchableOpacity>
-              </Animated.View>
-            ))}
+                  </TouchableOpacity>
+                </Animated.View>
+              ))
+          )}
         </View>
       </ScrollView>
 

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -14,119 +14,49 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Colors } from "@/constants/theme";
-
-interface Friend {
-  user_id: number;
-  account_id: string;
-  display_name: string;
-  icon_asset_url: string;
-  updated_at: string;
-}
-
-interface FriendRequest {
-  user_id: number;
-  account_id: string;
-  display_name: string;
-  icon_asset_url: string;
-  updated_at: string;
-}
-
-interface FriendData {
-  friend: Friend[];
-  friend_requested: FriendRequest[];
-  friend_recommended: Friend[];
-  friend_requesting: FriendRequest[];
-  friend_blocked: Friend[];
-}
-
-// API仕様に合わせたモックデータ
-const mockFriendData: FriendData = {
-  friend: [
-    {
-      user_id: 1,
-      account_id: "tanaka123",
-      display_name: "田中さん",
-      icon_asset_url: "https://picsum.photos/100/100?random=1",
-      updated_at: "2023-10-11T12:00:00Z",
-    },
-    {
-      user_id: 2,
-      account_id: "sato_san",
-      display_name: "佐藤さん",
-      icon_asset_url: "https://picsum.photos/100/100?random=2",
-      updated_at: "2023-10-11T11:00:00Z",
-    },
-    {
-      user_id: 3,
-      account_id: "yamada_y",
-      display_name: "山田さん",
-      icon_asset_url: "https://picsum.photos/100/100?random=3",
-      updated_at: "2023-10-11T10:00:00Z",
-    },
-    {
-      user_id: 4,
-      account_id: "suzuki_s",
-      display_name: "鈴木さん",
-      icon_asset_url: "https://picsum.photos/100/100?random=4",
-      updated_at: "2023-10-11T09:00:00Z",
-    },
-  ],
-  friend_requested: [
-    {
-      user_id: 5,
-      account_id: "matsumoto_taro",
-      display_name: "松本太郎",
-      icon_asset_url: "https://picsum.photos/100/100?random=5",
-      updated_at: "2023-10-10T15:00:00Z",
-    },
-    {
-      user_id: 6,
-      account_id: "sasaki_hanako",
-      display_name: "佐々木花子",
-      icon_asset_url: "https://picsum.photos/100/100?random=6",
-      updated_at: "2023-10-09T14:00:00Z",
-    },
-  ],
-  friend_recommended: [
-    {
-      user_id: 7,
-      account_id: "watanabe_w",
-      display_name: "渡辺さん",
-      icon_asset_url: "https://picsum.photos/100/100?random=7",
-      updated_at: "2023-10-11T08:00:00Z",
-    },
-    {
-      user_id: 8,
-      account_id: "nakamura_n",
-      display_name: "中村さん",
-      icon_asset_url: "https://picsum.photos/100/100?random=8",
-      updated_at: "2023-10-11T07:00:00Z",
-    },
-  ],
-  friend_requesting: [
-    {
-      user_id: 9,
-      account_id: "saito_jiro",
-      display_name: "斎藤次郎",
-      icon_asset_url: "https://picsum.photos/100/100?random=9",
-      updated_at: "2023-10-11T16:00:00Z",
-    },
-  ],
-  friend_blocked: [
-    {
-      user_id: 10,
-      account_id: "blocked_user",
-      display_name: "ブロック済みユーザー",
-      icon_asset_url: "https://picsum.photos/100/100?random=10",
-      updated_at: "2023-10-08T12:00:00Z",
-    },
-  ],
-};
+import {
+  apiClient,
+  withUserId,
+  FriendData as ApiFriendData,
+  User,
+} from "@/services/api-client";
 
 export default function FriendsScreen() {
   const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme ?? "light"];
+  const [friendData, setFriendData] = useState<ApiFriendData>({
+    friend: [],
+    friend_requested: [],
+    friend_recommended: [],
+    friend_requesting: [],
+    friend_blocked: [],
+  });
+  const [loading, setLoading] = useState(true);
   const [showUserSearch, setShowUserSearch] = useState(false);
   const [showFriendRequests, setShowFriendRequests] = useState(false);
+
+  // フレンドデータを取得する関数
+  const fetchFriendData = async () => {
+    try {
+      const result = await withUserId(async (userId) => {
+        return apiClient.get<ApiFriendData>("/api/friend", { user_id: userId });
+      });
+
+      if (result.data) {
+        setFriendData(result.data);
+      } else {
+        console.error("Failed to fetch friend data:", result.error);
+      }
+    } catch (error) {
+      console.error("Error fetching friend data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchFriendData();
+  }, []);
   const [showBlockedUsers, setShowBlockedUsers] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [requestTab, setRequestTab] = useState<"received" | "sent">("received");
@@ -134,7 +64,7 @@ export default function FriendsScreen() {
   const textColor = Colors[colorScheme ?? "light"].text as string;
   const backgroundColor = Colors[colorScheme ?? "light"].background as string;
 
-  const renderFriend = ({ item }: { item: Friend }) => (
+  const renderFriend = ({ item }: { item: User }) => (
     <View style={styles.friendCard}>
       <View style={styles.friendInfo}>
         <View style={styles.avatarContainer}>
@@ -162,7 +92,7 @@ export default function FriendsScreen() {
     </View>
   );
 
-  const renderFriendRequest = ({ item }: { item: FriendRequest }) => (
+  const renderFriendRequest = ({ item }: { item: User }) => (
     <View style={styles.requestCard}>
       <View style={styles.friendInfo}>
         <View style={styles.avatarContainer}>
@@ -241,7 +171,7 @@ export default function FriendsScreen() {
 
       {/* Friends List */}
       <FlatList
-        data={mockFriendData.friend}
+        data={friendData.friend}
         renderItem={renderFriend}
         keyExtractor={(item) => item.user_id.toString()}
         style={styles.friendsList}
@@ -299,7 +229,7 @@ export default function FriendsScreen() {
               おすすめのユーザー
             </Text>
             <FlatList
-              data={mockFriendData.friend_recommended}
+              data={friendData.friend_recommended}
               renderItem={renderFriend}
               keyExtractor={(item) => item.user_id.toString()}
               showsVerticalScrollIndicator={false}
@@ -367,8 +297,8 @@ export default function FriendsScreen() {
           <FlatList
             data={
               requestTab === "received"
-                ? mockFriendData.friend_requested
-                : mockFriendData.friend_requesting
+                ? friendData.friend_requested
+                : friendData.friend_requesting
             }
             renderItem={renderFriendRequest}
             keyExtractor={(item) => item.user_id.toString()}
@@ -402,7 +332,7 @@ export default function FriendsScreen() {
           </View>
 
           <FlatList
-            data={mockFriendData.friend_blocked}
+            data={friendData.friend_blocked}
             renderItem={renderFriend}
             keyExtractor={(item) => item.user_id.toString()}
             style={styles.blockedList}

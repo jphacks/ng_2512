@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import { router } from "expo-router";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { apiClient, withUserId, User } from "@/services/api-client";
 
 interface CreateGroupProps {
   visible: boolean;
@@ -29,57 +30,44 @@ interface Friend {
   isOnline: boolean;
 }
 
-// モックフレンドデータ
-const mockFriends: Friend[] = [
-  {
-    user_id: 1,
-    account_id: "tanaka123",
-    display_name: "田中太郎",
-    isOnline: true,
-  },
-  {
-    user_id: 2,
-    account_id: "sato_san",
-    display_name: "佐藤花子",
-    isOnline: false,
-  },
-  {
-    user_id: 3,
-    account_id: "yamada_y",
-    display_name: "山田美香",
-    isOnline: false,
-  },
-  {
-    user_id: 4,
-    account_id: "suzuki_s",
-    display_name: "鈴木一郎",
-    isOnline: true,
-  },
-  {
-    user_id: 5,
-    account_id: "takahashi_t",
-    display_name: "高橋健太",
-    isOnline: false,
-  },
-  {
-    user_id: 6,
-    account_id: "ito_i",
-    display_name: "伊藤さくら",
-    isOnline: true,
-  },
-];
-
 export default function CreateGroupScreen({
   visible,
   onClose,
 }: CreateGroupProps) {
   const [groupName, setGroupName] = useState("");
   const [member_ids, setMemberIds] = useState<number[]>([]);
+  const [friends, setFriends] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
 
-  const filteredFriends = mockFriends.filter(
+  // フレンド一覧を取得
+  const fetchFriends = async () => {
+    try {
+      const result = await withUserId(async (userId) => {
+        return apiClient.get<any>("/api/friend", { user_id: userId });
+      });
+
+      if (result.data?.friend) {
+        setFriends(result.data.friend);
+      } else {
+        console.error("Failed to fetch friends:", result.error);
+      }
+    } catch (error) {
+      console.error("Error fetching friends:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (visible) {
+      fetchFriends();
+    }
+  }, [visible]);
+
+  const filteredFriends = friends.filter(
     (friend) =>
       friend.display_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       friend.account_id.toLowerCase().includes(searchQuery.toLowerCase())
@@ -93,7 +81,7 @@ export default function CreateGroupScreen({
     );
   };
 
-  const createGroup = () => {
+  const createGroup = async () => {
     if (!groupName.trim()) {
       Alert.alert("エラー", "グループ名を入力してください");
       return;
@@ -103,14 +91,31 @@ export default function CreateGroupScreen({
       return;
     }
 
-    // グループ作成のロジック
-    // POST /api/chat/groupe with: title, member_ids
-    Alert.alert("成功", "グループが作成されました！", [
-      {
-        text: "OK",
-        onPress: () => onClose(),
-      },
-    ]);
+    try {
+      const result = await apiClient.post("/api/chat/groupe", {
+        title: groupName.trim(),
+        member_ids: member_ids.map((id) => id.toString()),
+      });
+
+      if (result.error) {
+        Alert.alert("エラー", "グループの作成に失敗しました");
+        return;
+      }
+
+      Alert.alert("成功", "グループが作成されました！", [
+        {
+          text: "OK",
+          onPress: () => {
+            onClose();
+            setGroupName("");
+            setMemberIds([]);
+          },
+        },
+      ]);
+    } catch (error) {
+      console.error("Error creating group:", error);
+      Alert.alert("エラー", "グループの作成に失敗しました");
+    }
   };
 
   return (
@@ -261,8 +266,8 @@ export default function CreateGroupScreen({
               </Text>
               <View style={styles.selectedFriends}>
                 {member_ids.map((friendUserId) => {
-                  const friend = mockFriends.find(
-                    (f) => f.user_id === friendUserId
+                  const friend = friends.find(
+                    (f: User) => f.user_id === friendUserId
                   );
                   if (!friend) return null;
                   return (

@@ -16,70 +16,40 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import CreateGroupScreen from "../chat/create-group";
-
-interface ChatRoom {
-  chat_groupe_id: number;
-  title: string;
-  icon_url: string;
-  last_message: string;
-  last_message_date: string;
-  new_chat_num: number;
-}
-
-// API仕様に合わせたモックデータ
-const mockChatRooms: ChatRoom[] = [
-  {
-    chat_groupe_id: 1,
-    title: "田中さん",
-    icon_url: "https://picsum.photos/100/100?random=1",
-    last_message: "映画の件、どうでしたか？",
-    last_message_date: "2025-10-11T14:30:00Z",
-    new_chat_num: 2,
-  },
-  {
-    chat_groupe_id: 2,
-    title: "開発チーム",
-    icon_url: "https://picsum.photos/100/100?random=2",
-    last_message: "明日のミーティングの件です",
-    last_message_date: "2025-10-11T13:45:00Z",
-    new_chat_num: 5,
-  },
-  {
-    chat_groupe_id: 3,
-    title: "佐藤さん",
-    icon_url: "https://picsum.photos/100/100?random=3",
-    last_message: "ありがとうございました！",
-    last_message_date: "2025-10-11T12:20:00Z",
-    new_chat_num: 0,
-  },
-  {
-    chat_groupe_id: 4,
-    title: "家族グループ",
-    icon_url: "https://picsum.photos/100/100?random=4",
-    last_message: "今度の週末はどうする？",
-    last_message_date: "2025-10-11T11:15:00Z",
-    new_chat_num: 3,
-  },
-  {
-    chat_groupe_id: 5,
-    title: "山田さん",
-    icon_url: "https://picsum.photos/100/100?random=5",
-    last_message: "お疲れさまでした",
-    last_message_date: "2025-10-11T09:30:00Z",
-    new_chat_num: 0,
-  },
-];
+import { apiClient, withUserId, ChatGroup } from "@/services/api-client";
 
 export default function ChatScreen() {
-  const [chatRooms, setChatRooms] = useState(mockChatRooms);
+  const [chatRooms, setChatRooms] = useState<ChatGroup[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [fadeAnim] = useState(new Animated.Value(0));
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
 
+  // チャットルーム一覧を取得する関数
+  const fetchChatRooms = async () => {
+    try {
+      const result = await withUserId(async (userId) => {
+        return apiClient.get<ChatGroup[]>("/api/chat", { user_id: userId });
+      });
+
+      if (result.data) {
+        setChatRooms(result.data);
+      } else {
+        console.error("Failed to fetch chat rooms:", result.error);
+      }
+    } catch (error) {
+      console.error("Error fetching chat rooms:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
+    fetchChatRooms();
+
     // エントランスアニメーション
     Animated.timing(fadeAnim, {
       toValue: 1,
@@ -90,10 +60,9 @@ export default function ChatScreen() {
 
   const onRefresh = () => {
     setRefreshing(true);
-    // API呼び出しをシミュレート
-    setTimeout(() => {
+    fetchChatRooms().finally(() => {
       setRefreshing(false);
-    }, 1000);
+    });
   };
 
   const formatTime = (dateString: string) => {
@@ -136,7 +105,7 @@ export default function ChatScreen() {
     item,
     index,
   }: {
-    item: ChatRoom;
+    item: ChatGroup;
     index: number;
   }) => {
     const isUnread = item.new_chat_num > 0;

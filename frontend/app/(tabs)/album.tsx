@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -15,6 +15,11 @@ import { router } from "expo-router";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import {
+  apiClient,
+  withUserId,
+  Album as ApiAlbum,
+} from "@/services/api-client";
 
 interface Album {
   albam_id: number;
@@ -34,6 +39,8 @@ interface User {
 export default function AlbumScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
+  const [albums, setAlbums] = useState<ApiAlbum[]>([]);
+  const [loading, setLoading] = useState(true);
   const [createAlbumVisible, setCreateAlbumVisible] = useState(false);
   const [albumTitle, setAlbumTitle] = useState("");
   const [selectedUsers, setSelectedUsers] = useState<User[]>([
@@ -49,30 +56,31 @@ export default function AlbumScreen() {
     { id: "10", name: "加藤さん", username: "@kato_k", selected: false },
   ]);
 
-  // API仕様に合わせたモックデータ
-  const albums: Album[] = [
-    {
-      albam_id: 1,
-      title: "夏の思い出",
-      last_uploaded_image_url: "https://picsum.photos/200/200?random=1",
-      image_num: 12,
-      shared_user_num: 3,
-    },
-    {
-      albam_id: 2,
-      title: "カフェ巡り",
-      last_uploaded_image_url: "https://picsum.photos/200/200?random=2",
-      image_num: 8,
-      shared_user_num: 2,
-    },
-    {
-      albam_id: 3,
-      title: "美術館巡り",
-      last_uploaded_image_url: "https://picsum.photos/200/200?random=3",
-      image_num: 5,
-      shared_user_num: 3,
-    },
-  ];
+  // アルバム一覧を取得する関数
+  const fetchAlbums = async () => {
+    try {
+      const result = await withUserId(async (userId) => {
+        return apiClient.get<ApiAlbum[]>("/api/albam", {
+          user_id: userId,
+          oldest_albam_id: null,
+        });
+      });
+
+      if (result.data) {
+        setAlbums(result.data);
+      } else {
+        console.error("Failed to fetch albums:", result.error);
+      }
+    } catch (error) {
+      console.error("Error fetching albums:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAlbums();
+  }, []);
 
   const toggleUserSelection = (userId: string) => {
     setSelectedUsers((users) =>
@@ -85,20 +93,39 @@ export default function AlbumScreen() {
   const getSelectedCount = () =>
     selectedUsers.filter((user) => user.selected).length;
 
-  const handleCreateAlbum = () => {
-    if (albumTitle.trim()) {
-      // TODO: アルバム作成ロジックを実装
+  const handleCreateAlbum = async () => {
+    if (!albumTitle.trim()) return;
+
+    try {
+      const result = await withUserId(async (userId) => {
+        return apiClient.post("/api/albam", {
+          user_id: userId,
+          title: albumTitle.trim(),
+        });
+      });
+
+      if (result.error) {
+        console.error("Failed to create album:", result.error);
+        return;
+      }
+
+      // アルバム一覧を再取得
+      await fetchAlbums();
+
+      // モーダルを閉じてリセット
       setCreateAlbumVisible(false);
       setAlbumTitle("");
       setSelectedUsers((users) =>
         users.map((user) => ({ ...user, selected: false }))
       );
+    } catch (error) {
+      console.error("Error creating album:", error);
     }
   };
 
   const isCreateEnabled = albumTitle.trim().length > 0;
 
-  const handleAlbumPress = (album: Album) => {
+  const handleAlbumPress = (album: ApiAlbum) => {
     // アルバム詳細画面への遷移
     router.push({
       pathname: "/album/[id]",
@@ -193,7 +220,7 @@ export default function AlbumScreen() {
                   { backgroundColor: colors.background },
                 ]}
               >
-                <Text style={styles.statNumber}>3</Text>
+                <Text style={styles.statNumber}>{albums.length}</Text>
                 <Text
                   style={[styles.statLabel, { color: colors.textSecondary }]}
                 >
@@ -207,7 +234,7 @@ export default function AlbumScreen() {
                 ]}
               >
                 <Text style={[styles.statNumber, { color: "#f6339a" }]}>
-                  25
+                  {albums.reduce((total, album) => total + album.image_num, 0)}
                 </Text>
                 <Text
                   style={[styles.statLabel, { color: colors.textSecondary }]}
@@ -221,7 +248,12 @@ export default function AlbumScreen() {
                   { backgroundColor: colors.background },
                 ]}
               >
-                <Text style={[styles.statNumber, { color: "#2b7fff" }]}>8</Text>
+                <Text style={[styles.statNumber, { color: "#2b7fff" }]}>
+                  {albums.reduce(
+                    (total, album) => total + album.shared_user_num,
+                    0
+                  )}
+                </Text>
                 <Text
                   style={[styles.statLabel, { color: colors.textSecondary }]}
                 >
@@ -230,13 +262,21 @@ export default function AlbumScreen() {
               </View>
             </View>
 
+            {loading && (
+              <View style={styles.statCard}>
+                <Text style={[styles.statNumber, { color: colors.text }]}>
+                  読み込み中...
+                </Text>
+              </View>
+            )}
+
             {/* Albums Section Header */}
             <View style={styles.sectionHeader}>
               <Text style={[styles.sectionTitle, { color: colors.text }]}>
                 アルバム一覧
               </Text>
               <View style={styles.albumCountBadge}>
-                <Text style={styles.albumCountText}>3個</Text>
+                <Text style={styles.albumCountText}>{albums.length}個</Text>
               </View>
             </View>
           </View>

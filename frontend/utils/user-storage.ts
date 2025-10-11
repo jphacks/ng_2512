@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { apiClient } from "@/services/api-client";
 
 const USER_ID_KEY = "user_id";
 const SETUP_COMPLETED_KEY = "setup_completed";
@@ -75,8 +76,7 @@ export const setSetupCompleted = async (): Promise<void> => {
 };
 
 /**
- * 新しいユーザーを作成（モック実装）
- * 実際のアプリでは POST /api/user/create を呼び出す
+ * 新しいユーザーを作成（実際のAPI呼び出し）
  */
 export const createUser = async (userData: {
   account_id: string;
@@ -86,20 +86,42 @@ export const createUser = async (userData: {
   profile_text?: string;
 }): Promise<number> => {
   try {
-    // TODO: 実際のAPI呼び出しに置き換える
-    // const response = await fetch('/api/user/create', {
-    //   method: 'POST',
-    //   headers: {
-    //     'Content-Type': 'application/json',
-    //   },
-    //   body: JSON.stringify(userData),
-    // });
-    // const result = await response.json();
-    // return result.user_id;
+    const formData = new FormData();
+    formData.append("account_id", userData.account_id);
+    formData.append("display_name", userData.display_name);
 
-    // モック実装: 常にuser_id=1を返す
-    console.log("Creating user with data:", userData);
-    return 1;
+    if (userData.profile_text) {
+      formData.append("profile_text", userData.profile_text);
+    }
+
+    if (userData.icon_image) {
+      formData.append("icon_image", {
+        uri: userData.icon_image.uri,
+        type: userData.icon_image.type || "image/jpeg",
+        name: "icon.jpg",
+      } as any);
+    }
+
+    if (userData.face_image) {
+      formData.append("face_image", {
+        uri: userData.face_image.uri,
+        type: userData.face_image.type || "image/jpeg",
+        name: "face.jpg",
+      } as any);
+    }
+
+    const result = await apiClient.postWithFile<{ user_id: number }>(
+      "/api/user/create",
+      formData
+    );
+
+    if (result.data) {
+      console.log("User created successfully:", result.data.user_id);
+      return result.data.user_id;
+    } else {
+      console.error("Failed to create user:", result.error);
+      throw new Error(result.error || "User creation failed");
+    }
   } catch (error) {
     console.error("Failed to create user:", error);
     throw error;
