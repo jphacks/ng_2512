@@ -1,0 +1,883 @@
+import React, { useState, useEffect } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  FlatList,
+  Modal,
+  Animated,
+  Dimensions,
+  RefreshControl,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { IconSymbol } from "@/components/ui/icon-symbol";
+import { router } from "expo-router";
+import { Colors } from "@/constants/theme";
+import { useColorScheme } from "@/hooks/use-color-scheme";
+
+const { width: screenWidth } = Dimensions.get("window");
+
+interface Proposal {
+  id: string;
+  title: string;
+  datetime: Date;
+  participants: string[];
+  location: string;
+  createdBy: string;
+  acceptedCount: number;
+  rejectedCount: number;
+  status: "pending" | "accepted" | "rejected" | "expired";
+  createdAt: Date;
+}
+
+// モックデータ
+const mockProposals: Proposal[] = [
+  {
+    id: "1",
+    title: "週末の映画鑑賞",
+    datetime: new Date("2025-10-12T14:00:00"),
+    participants: ["田中", "佐藤", "鈴木"],
+    location: "新宿の映画館",
+    createdBy: "友達",
+    acceptedCount: 0,
+    rejectedCount: 0,
+    status: "pending",
+    createdAt: new Date("2025-10-07T10:00:00"),
+  },
+  {
+    id: "2",
+    title: "カフェでまったり読書会",
+    datetime: new Date("2025-10-15T10:00:00"),
+    participants: ["山田", "高橋"],
+    location: "表参道のブックカフェ",
+    createdBy: "あなた",
+    acceptedCount: 1,
+    rejectedCount: 0,
+    status: "pending",
+    createdAt: new Date("2025-10-12T15:30:00"),
+  },
+  {
+    id: "3",
+    title: "美術館でアート鑑賞",
+    datetime: new Date("2025-10-20T13:00:00"),
+    participants: ["伊藤", "松本", "清水", "井上"],
+    location: "上野の国立美術館",
+    createdBy: "友達",
+    acceptedCount: 0,
+    rejectedCount: 0,
+    status: "pending",
+    createdAt: new Date("2025-10-09T12:00:00"),
+  },
+];
+
+export default function ProposalsScreen() {
+  const [proposals, setProposals] = useState(mockProposals);
+  const [selectedProposal, setSelectedProposal] = useState<Proposal | null>(
+    null
+  );
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [fadeAnim] = useState(new Animated.Value(0));
+  const [slideAnim] = useState(new Animated.Value(50));
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme ?? "light"];
+
+  useEffect(() => {
+    // エントランスアニメーション
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
+  const onRefresh = React.useCallback(() => {
+    setRefreshing(true);
+    // モックリフレッシュ
+    setTimeout(() => {
+      setRefreshing(false);
+    }, 1000);
+  }, []);
+
+  const formatDate = (date: Date) => {
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    const weekday = ["日", "月", "火", "水", "木", "金", "土"][date.getDay()];
+    const hours = date.getHours();
+    const minutes = date.getMinutes().toString().padStart(2, "0");
+    
+    return `${month}月${day}日(${weekday}) ${hours}:${minutes}〜`;
+  };
+
+  const isExpired = (proposal: Proposal) => {
+    const expiryDate = new Date(proposal.createdAt);
+    expiryDate.setDate(expiryDate.getDate() + 7);
+    return new Date() > expiryDate;
+  };
+
+  const handleAccept = (proposalId: string) => {
+    setProposals((prev) =>
+      prev.map((p) =>
+        p.id === proposalId
+          ? {
+              ...p,
+              acceptedCount: p.acceptedCount + 1,
+              status: "accepted" as const,
+            }
+          : p
+      )
+    );
+    setSelectedProposal(null);
+  };
+
+  const handleReject = (proposalId: string) => {
+    setProposals((prev) => prev.filter((p) => p.id !== proposalId));
+    setSelectedProposal(null);
+  };
+
+  const renderProposalCard = ({
+    item,
+    index,
+  }: {
+    item: Proposal;
+    index: number;
+  }) => {
+    const expired = isExpired(item);
+    if (expired) return null;
+
+    return null; // このメソッドはもう使用しない
+  };
+
+  return (
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: "#F5F5F5" }]}
+    >
+      {/* Header */}
+      <View style={[styles.header, { backgroundColor: "#FFFFFF" }]}>
+        <View style={styles.headerContent}>
+          <View style={styles.headerLeft}>
+            <Text style={[styles.headerTitle, { color: "#1E2939" }]}>提案</Text>
+            <Text style={[styles.headerSubtitle, { color: "#6A7282" }]}>友達からの提案をチェック</Text>
+          </View>
+          <View style={styles.headerRight}>
+            <TouchableOpacity style={styles.headerIconButton}>
+              <IconSymbol name="magnifyingglass" size={16} color="#6A7282" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.headerIconButton}>
+              <IconSymbol name="bell" size={16} color="#6A7282" />
+              <View style={styles.notificationBadge}>
+                <Text style={styles.notificationText}>3</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+
+      <ScrollView
+        style={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
+      >
+        {/* Create Button */}
+        <TouchableOpacity
+          style={styles.createButton}
+          onPress={() => router.push("/create-proposal")}
+        >
+          <IconSymbol name="plus" size={16} color="#FFFFFF" />
+          <Text style={styles.createButtonText}>新しい提案を作成</Text>
+        </TouchableOpacity>
+
+        {/* Stats Cards */}
+        <View style={styles.statsContainer}>
+          <View style={[styles.statCard, { backgroundColor: "#FFFFFF" }]}>
+            <Text style={[styles.statNumber, { color: "#2B7FFF" }]}>2</Text>
+            <Text style={[styles.statLabel, { color: "#4A5565" }]}>新着提案</Text>
+          </View>
+          <View style={[styles.statCard, { backgroundColor: "#FFFFFF" }]}>
+            <Text style={[styles.statNumber, { color: "#00C950" }]}>1</Text>
+            <Text style={[styles.statLabel, { color: "#4A5565" }]}>作成中</Text>
+          </View>
+          <View style={[styles.statCard, { backgroundColor: "#FFFFFF" }]}>
+            <Text style={[styles.statNumber, { color: "#AD46FF" }]}>0</Text>
+            <Text style={[styles.statLabel, { color: "#4A5565" }]}>承認済み</Text>
+          </View>
+        </View>
+
+        {/* Proposals List */}
+        <View style={styles.proposalsSection}>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: "#1E2939" }]}>提案一覧</Text>
+            <View style={styles.countBadge}>
+              <Text style={[styles.countText, { color: "#155DFC" }]}>3件</Text>
+            </View>
+          </View>
+          
+          {proposals.filter((p) => !isExpired(p)).map((item, index) => (
+            <Animated.View
+              key={item.id}
+              style={[
+                styles.proposalCard,
+                {
+                  opacity: fadeAnim,
+                  transform: [
+                    {
+                      translateY: slideAnim.interpolate({
+                        inputRange: [0, 50],
+                        outputRange: [0, 50],
+                      }),
+                    },
+                  ],
+                },
+              ]}
+            >
+              <TouchableOpacity
+                onPress={() => setSelectedProposal(item)}
+                activeOpacity={0.7}
+                style={styles.cardTouchable}
+              >
+                {/* Card Header */}
+                <View style={styles.cardHeader}>
+                  <Text style={[styles.proposalTitle, { color: "#1E2939" }]}>
+                    {item.title}
+                  </Text>
+                  <View style={styles.statusBadge}>
+                    <Text style={[styles.statusText, { color: "#894B00" }]}>待機中</Text>
+                  </View>
+                </View>
+
+                {/* Card Info */}
+                <View style={styles.cardInfo}>
+                  <View style={styles.infoRow}>
+                    <IconSymbol name="location" size={16} color="#4A5565" />
+                    <Text style={[styles.infoText, { color: "#4A5565" }]}>
+                      {item.location}
+                    </Text>
+                  </View>
+                  <View style={styles.infoRow}>
+                    <IconSymbol name="calendar" size={16} color="#4A5565" />
+                    <Text style={[styles.infoText, { color: "#4A5565" }]}>
+                      {formatDate(item.datetime)}
+                    </Text>
+                    {item.participants.length > 1 && (
+                      <Text style={[styles.moreText, { color: "#99A1AF" }]}>他{item.participants.length - 1}件</Text>
+                    )}
+                  </View>
+                  <View style={styles.infoRow}>
+                    <IconSymbol name="person.2" size={16} color="#4A5565" />
+                    <Text style={[styles.infoText, { color: "#4A5565" }]}>
+                      {item.participants.length}人
+                    </Text>
+                    {item.acceptedCount > 0 && (
+                      <Text style={[styles.acceptedInfo, { color: "#155DFC" }]}>
+                        {item.acceptedCount}/{item.participants.length}人が承認
+                      </Text>
+                    )}
+                  </View>
+                </View>
+
+                {/* Card Footer */}
+                <View style={styles.cardFooter}>
+                  <View style={styles.timeInfo}>
+                    <IconSymbol name="clock" size={12} color="#6A7282" />
+                    <Text style={[styles.timeText, { color: "#6A7282" }]}>あと5日</Text>
+                  </View>
+                  {item.createdBy === "あなた" && (
+                    <Text style={[styles.ownProposal, { color: "#155DFC" }]}>自分の提案</Text>
+                  )}
+                </View>
+              </TouchableOpacity>
+            </Animated.View>
+          ))}
+        </View>
+      </ScrollView>
+
+      {/* 提案詳細モーダル */}
+      <Modal
+        visible={selectedProposal !== null}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setSelectedProposal(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View
+            style={[styles.modalContent, { backgroundColor: colors.surface }]}
+          >
+            {selectedProposal && (
+              <>
+                <View
+                  style={[
+                    styles.modalHeader,
+                    { borderBottomColor: colors.border },
+                  ]}
+                >
+                  <Text style={[styles.modalTitle, { color: colors.text }]}>
+                    {selectedProposal.title}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => setSelectedProposal(null)}
+                    style={styles.closeButton}
+                  >
+                    <IconSymbol name="xmark" size={24} color={colors.icon} />
+                  </TouchableOpacity>
+                </View>
+
+                <ScrollView
+                  style={styles.modalBody}
+                  showsVerticalScrollIndicator={false}
+                >
+                  <View
+                    style={[
+                      styles.detailCard,
+                      { backgroundColor: colors.surfaceSecondary },
+                    ]}
+                  >
+                    <View style={styles.detailRow}>
+                      <View
+                        style={[
+                          styles.iconContainer,
+                          { backgroundColor: colors.primary + "20" },
+                        ]}
+                      >
+                        <IconSymbol
+                          name="calendar"
+                          size={20}
+                          color={colors.primary}
+                        />
+                      </View>
+                      <Text style={[styles.detailText, { color: colors.text }]}>
+                        {formatDate(selectedProposal.datetime)}
+                      </Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <View
+                        style={[
+                          styles.iconContainer,
+                          { backgroundColor: colors.accent + "20" },
+                        ]}
+                      >
+                        <IconSymbol
+                          name="location"
+                          size={20}
+                          color={colors.accent}
+                        />
+                      </View>
+                      <Text style={[styles.detailText, { color: colors.text }]}>
+                        {selectedProposal.location}
+                      </Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <View
+                        style={[
+                          styles.iconContainer,
+                          { backgroundColor: colors.secondary + "20" },
+                        ]}
+                      >
+                        <IconSymbol
+                          name="person.2"
+                          size={20}
+                          color={colors.secondary}
+                        />
+                      </View>
+                      <Text style={[styles.detailText, { color: colors.text }]}>
+                        参加者: {selectedProposal.participants.join(", ")}
+                      </Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <View
+                        style={[
+                          styles.iconContainer,
+                          { backgroundColor: colors.warning + "20" },
+                        ]}
+                      >
+                        <IconSymbol
+                          name="person"
+                          size={20}
+                          color={colors.warning}
+                        />
+                      </View>
+                      <Text style={[styles.detailText, { color: colors.text }]}>
+                        作成者: {selectedProposal.createdBy}
+                      </Text>
+                    </View>
+                  </View>
+                </ScrollView>
+
+                {selectedProposal.createdBy !== "あなた" && (
+                  <View style={styles.actionButtons}>
+                    <TouchableOpacity
+                      style={[
+                        styles.actionButton,
+                        { backgroundColor: colors.error },
+                      ]}
+                      onPress={() => handleReject(selectedProposal.id)}
+                      activeOpacity={0.8}
+                    >
+                      <IconSymbol name="xmark" size={20} color="#fff" />
+                      <Text style={styles.rejectButtonText}>拒否</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.actionButton,
+                        { backgroundColor: colors.success },
+                      ]}
+                      onPress={() => handleAccept(selectedProposal.id)}
+                      activeOpacity={0.8}
+                    >
+                      <IconSymbol name="checkmark" size={20} color="#fff" />
+                      <Text style={styles.acceptButtonText}>承諾</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {selectedProposal.createdBy === "あなた" && (
+                  <View
+                    style={[
+                      styles.statusInfo,
+                      { backgroundColor: colors.surfaceSecondary },
+                    ]}
+                  >
+                    <View style={styles.statusRow}>
+                      <View style={styles.statusItem}>
+                        <Text
+                          style={[
+                            styles.statusNumber,
+                            { color: colors.success },
+                          ]}
+                        >
+                          {selectedProposal.acceptedCount}
+                        </Text>
+                        <Text
+                          style={[styles.statusLabel, { color: colors.text }]}
+                        >
+                          承諾
+                        </Text>
+                      </View>
+                      <View
+                        style={[
+                          styles.statusDivider,
+                          { backgroundColor: colors.border },
+                        ]}
+                      />
+                      <View style={styles.statusItem}>
+                        <Text
+                          style={[styles.statusNumber, { color: colors.error }]}
+                        >
+                          {selectedProposal.rejectedCount}
+                        </Text>
+                        <Text
+                          style={[styles.statusLabel, { color: colors.text }]}
+                        >
+                          拒否
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                )}
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* 作成モーダル（プレースホルダー） */}
+      <Modal
+        visible={showCreateModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowCreateModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>提案を作成</Text>
+              <TouchableOpacity onPress={() => setShowCreateModal(false)}>
+                <IconSymbol name="xmark" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.createOptions}>
+              <TouchableOpacity style={styles.createOption}>
+                <IconSymbol name="wand.and.stars" size={24} color="#007AFF" />
+                <Text style={styles.createOptionText}>AIで自動生成</Text>
+                <Text style={styles.createOptionDesc}>
+                  AIがあなたの好みに合わせて提案を作成します
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.createOption}>
+                <IconSymbol name="pencil" size={24} color="#007AFF" />
+                <Text style={styles.createOptionText}>手動で作成</Text>
+                <Text style={styles.createOptionDesc}>
+                  自分で詳細を入力して提案を作成します
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  header: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 16,
+    borderBottomWidth: 1.33,
+    borderBottomColor: "#E5E7EB",
+  },
+  headerContent: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  headerLeft: {
+    flex: 1,
+  },
+  headerTitle: {
+    fontSize: 16,
+    fontWeight: "400",
+    lineHeight: 24,
+    marginBottom: 4,
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  headerRight: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  headerIconButton: {
+    width: 36,
+    height: 32,
+    borderRadius: 44739200,
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+  },
+  notificationBadge: {
+    position: "absolute",
+    top: -4,
+    right: -4,
+    backgroundColor: "#FB2C36",
+    borderRadius: 8,
+    width: 16,
+    height: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  notificationText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "400",
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: 16,
+  },
+  createButton: {
+    backgroundColor: "#2B7FFF",
+    backgroundImage: "linear-gradient(45deg, #2B7FFF, #AD46FF)",
+    borderRadius: 16,
+    height: 36,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    marginTop: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 15,
+    elevation: 4,
+  },
+  createButtonText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "400",
+  },
+  statsContainer: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 24,
+  },
+  statCard: {
+    flex: 1,
+    borderRadius: 16,
+    padding: 17,
+    alignItems: "center",
+    borderWidth: 1.33,
+    borderColor: "#E5E7EB",
+  },
+  statNumber: {
+    fontSize: 24,
+    lineHeight: 32,
+    fontWeight: "400",
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "400",
+  },
+  proposalsSection: {
+    marginTop: 24,
+    paddingBottom: 100,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    lineHeight: 24,
+    fontWeight: "400",
+  },
+  countBadge: {
+    backgroundColor: "#EEF4FF",
+    borderRadius: 44739200,
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+  },
+  countText: {
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "400",
+  },
+  proposalCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 17,
+    marginBottom: 12,
+    borderWidth: 1.33,
+    borderColor: "#E5E7EB",
+  },
+  cardTouchable: {
+    // No additional styles needed, just for touch handling
+  },
+  cardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  proposalTitle: {
+    fontSize: 16,
+    lineHeight: 24,
+    fontWeight: "400",
+    flex: 1,
+    marginRight: 8,
+  },
+  statusBadge: {
+    backgroundColor: "#FEF9C2",
+    borderRadius: 44739200,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  statusText: {
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "400",
+  },
+  cardInfo: {
+    gap: 8,
+    marginBottom: 16,
+  },
+  infoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  infoText: {
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: "400",
+    flex: 1,
+  },
+  moreText: {
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "400",
+  },
+  acceptedInfo: {
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: "400",
+  },
+  cardFooter: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  timeInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  timeText: {
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "400",
+  },
+  ownProposal: {
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "400",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.4)",
+    justifyContent: "flex-end",
+  },
+  modalContent: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    paddingTop: 24,
+    paddingHorizontal: 24,
+    paddingBottom: 40,
+    maxHeight: "85%",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 28,
+  },
+  modalTitle: {
+    fontSize: 24,
+    fontWeight: "700",
+    color: "#2C3E50",
+    letterSpacing: -0.5,
+  },
+  modalBody: {
+    gap: 20,
+    marginBottom: 28,
+  },
+  detailRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+    paddingVertical: 4,
+  },
+  detailText: {
+    fontSize: 17,
+    color: "#34495E",
+    flex: 1,
+    lineHeight: 24,
+  },
+  actionButtons: {
+    flexDirection: "row",
+    gap: 16,
+  },
+  actionButton: {
+    flex: 1,
+    paddingVertical: 16,
+    borderRadius: 16,
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 8,
+  },
+  acceptButtonText: {
+    color: "#fff",
+    fontSize: 17,
+    fontWeight: "600",
+  },
+  rejectButtonText: {
+    color: "#fff",
+    fontSize: 17,
+    fontWeight: "600",
+  },
+  statusInfo: {
+    alignItems: "center",
+    paddingVertical: 20,
+    backgroundColor: "#F8F9FA",
+    borderRadius: 16,
+  },
+  createOptions: {
+    gap: 20,
+    paddingVertical: 24,
+  },
+  createOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 20,
+    backgroundColor: "#F8F9FA",
+    borderRadius: 16,
+    gap: 16,
+  },
+  createOptionText: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#2C3E50",
+    flex: 1,
+  },
+  createOptionDesc: {
+    fontSize: 14,
+    color: "#7F8C8D",
+    flex: 2,
+    lineHeight: 20,
+  },
+  closeButton: {
+    padding: 8,
+    borderRadius: 20,
+  },
+  detailCard: {
+    borderRadius: 16,
+    padding: 20,
+    gap: 16,
+    marginBottom: 16,
+  },
+  iconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  statusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-around",
+  },
+  statusItem: {
+    alignItems: "center",
+    flex: 1,
+  },
+  statusNumber: {
+    fontSize: 28,
+    fontWeight: "700",
+    marginBottom: 4,
+  },
+  statusLabel: {
+    fontSize: 16,
+    fontWeight: "500",
+  },
+  statusDivider: {
+    width: 1,
+    height: 40,
+    marginHorizontal: 20,
+  },
+});
