@@ -330,3 +330,38 @@ UPDATE
     updated_status: enum
 }
 ```
+
+## 設定
+
+```
+POST
+/api/user/create
+{
+    account_id: string,
+    display_name: string,
+    icon_image: binary/null,
+    face_image: binary,
+    profile_text: string/null
+},
+{
+    user_id: int
+}
+認証の代わりにユーザーを登録する仮のエンドポイント
+同じaccoun_idがDBに存在していたらデータを上書き
+```
+
+```
+UPDATE
+/api/user
+{
+    user_id: int,
+    account_id: string,
+    display_name: string,
+    icon_image: binary/null,
+    face_image: binary/null,
+    profile_text: string/null
+},
+{
+    とくになし
+}
+```
