@@ -12,6 +12,7 @@
     "test:web": "playwright test"
   },
   "dependencies": {
+    "@noble/hashes": "^1.4.0",
     "@react-navigation/native": "^6.1.17",
     "@react-navigation/native-stack": "^6.9.25",
     "expo": "~51.0.13",

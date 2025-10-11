@@ -25,7 +25,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   extra: {
     apiBaseUrl: process.env.EXPO_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000",
     useFirebaseEmulators: process.env.EXPO_PUBLIC_USE_FIREBASE_EMULATORS === "1",
-    firebaseProjectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID ?? "recall-dev"
+    firebaseProjectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID ?? "recall-dev",
+    aiApiKey: process.env.EXPO_PUBLIC_AI_API_KEY ?? "dev-key",
+    aiApiSecret: process.env.EXPO_PUBLIC_AI_API_SECRET ?? "dev-secret"
   },
   updates: {
     url: process.env.EXPO_UPDATES_URL

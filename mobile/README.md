@@ -24,8 +24,11 @@ React Native（Expo）によるフロントエンドの下地です。CI1 の Do
 ## ディレクトリ構成
 - `App.tsx`: Expo のエントリポイント。React Navigation で `Home` スタックをレンダリングします。
 - `src/navigation/RootNavigator.tsx`: Stack ナビゲータの設定。
-- `src/screens/HomeScreen.tsx`: API ベース URL とエミュレータ設定を表示するプレースホルダ画面。
+- `src/screens/HomeScreen.tsx`: AI エンドポイントを直接叩き、テーマ/顔マッチ/提案生成の結果を確認できるデバッグ画面。
 - `src/hooks/useAppConfig.ts`: Expo Config (`extra`) を参照するユーティリティ。
+- `src/hooks/useAiClient.ts`: HMAC 署名付き AI クライアントを生成するカスタムフック。
+- `src/services/aiClient.ts`: `/ai/*` エンドポイント向けの薄い API ラッパ。
+- `src/utils/hmacAuth.ts`: HMAC-SHA256 署名ヘッダーを生成するユーティリティ。
 - `src/components/ui/PrimaryButton.tsx`: 最小 UI コンポーネント（アクセシビリティ対応）。
 - `__tests__/App.test.tsx`: `useAppConfig` を通じた設定表示のスモークテスト。
 
@@ -34,6 +37,8 @@ React Native（Expo）によるフロントエンドの下地です。CI1 の Do
 - `EXPO_PUBLIC_API_BASE_URL`（既定: `http://127.0.0.1:8000`）
 - `EXPO_PUBLIC_USE_FIREBASE_EMULATORS`（`1` で Firebase Emulator 接続を有効化）
 - `EXPO_PUBLIC_FIREBASE_PROJECT_ID`（既定: `recall-dev`）
+- `EXPO_PUBLIC_AI_API_KEY`（既定: `dev-key`）
+- `EXPO_PUBLIC_AI_API_SECRET`（既定: `dev-secret`）
 
 ## テストについて
 現状はネットワーク制限があるため依存インストールとテスト実行をローカルで確認できていません。Node 20 環境で `npm install` 実行後、`npm test` で `__tests__/App.test.tsx` が成功することを想定しています。同様に Docker ビルドも依存取得が必要です（CI はオンライン環境を前提としてください）。
