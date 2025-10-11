@@ -33,6 +33,7 @@ GET
         participants: [
             {
                 user_id: int,
+                account_id: string,
                 status: enum,
                 display_name: string,
                 icon_asset_url: string
@@ -239,3 +240,93 @@ UPDATE
 ```
 
 ## フレンド
+
+```
+GET
+/api/friend
+{
+    user_id: int,
+},
+{
+    friend: [
+        {
+            user_id: int,
+            account_id: string,
+            display_name: string,
+            icon_asset_url: string,
+            updated_at: datetime
+        },
+        ...
+    ],
+    friend_requested: [
+        {
+            user_id: int,
+            account_id: string,
+            display_name: string,
+            icon_asset_url: string,
+            updated_at: datetime
+        },
+        ...
+    ],
+    friend_recommended: [
+        {
+            user_id: int,
+            account_id: string,
+            display_name: string,
+            icon_asset_url: string,
+            updated_at: datetime
+        },
+        ...
+    ],
+    friend_requesting: [
+        {
+            user_id: int,
+            account_id: string,
+            display_name: string,
+            icon_asset_url: string,
+            updated_at: datetime
+        },
+        ...
+    ],
+    friend_blocked: [
+        {
+            user_id: int,
+            account_id: string,
+            display_name: string,
+            icon_asset_url: string,
+            updated_at: datetime
+        },
+        ...
+    ]
+}
+各種フレンド情報をまとめて取得
+```
+
+```
+GET
+/api/friend/search
+{
+    input_text: string
+},
+[
+    {
+        user_id: int,
+        account_id: string,
+        display_name: string,
+        icon_asset_url: string
+    },
+    ...
+]
+新しいアルバムが上に来るように。
+oldest_albam_id以前のチャットを10件ずつ取得。
+```
+
+```
+UPDATE
+/api/friend/request
+{
+    user_id: int,
+    friend_user_id: int,
+    updated_status: enum
+}
+```
