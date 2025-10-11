@@ -133,7 +133,7 @@ digraph DF {
   CI3 [style="filled", fillcolor="#c8e6c9", color="#2e7d32"];
   CI4 [style="filled", fillcolor="#c8e6c9", color="#2e7d32"];
   CI5 [style="filled", fillcolor="#c8e6c9", color="#2e7d32"];
-  CI6 [style="filled,bold", fillcolor="#bbdefb", color="#1565c0"];
+  CI6 [style="filled", fillcolor="#c8e6c9", color="#2e7d32"];
   CI7 [style="filled", fillcolor="#eeeeee", color="#9e9e9e"];
   FB11 [style="filled", fillcolor="#c8e6c9", color="#2e7d32"];
   FB12 [style="filled", fillcolor="#c8e6c9", color="#2e7d32"];

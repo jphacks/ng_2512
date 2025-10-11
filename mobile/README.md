@@ -16,6 +16,7 @@ React Native（Expo）によるフロントエンドの下地です。CI1 の Do
 ## 主なスクリプト
 - `npm run start`: Expo Dev Server を起動します。
 - `npm run test`: `jest-expo` ベースのテストを実行します。
+- `npm run test:web`: Playwright を利用した Web E2E テストを実行します（`mobile/playwright.config.ts`）。
 - `npm run lint`: ESLint（@react-native-community）で静的解析します。
 - `docker build -f Dockerfile --target test .`: テストターゲットのイメージをビルドし、Jest を実行します。
 - `docker build -f Dockerfile --target prod .`: Expo の Web Export を Nginx イメージに含めた本番ターゲットを生成します。

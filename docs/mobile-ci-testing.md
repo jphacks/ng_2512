@@ -6,6 +6,7 @@ Expo（React Native）アプリを Web で起動し、Playwright で E2E テス�
 - Web サーバ: `http://localhost:19006`（Expo）
 - バックエンド: `docker-compose.ci.yml` をベースに `deploy/docker-compose.mobile-e2e.yml` で `8000` をホスト公開
 - テスト内容: UI スモーク、Firebase 初期化、バックエンド疎通
+- 環境テンプレ: `deploy/.env.mobile-e2e.example`（CI では `deploy/.env.mobile-e2e` として生成）
 
 仕組み:
 - ワークフロー: `.github/workflows/mobile-web-e2e.yml`

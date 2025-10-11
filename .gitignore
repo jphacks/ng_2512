@@ -140,6 +140,7 @@ celerybeat.pid
 !.env.example
 !deploy/.env.deploy.example
 !deploy/.env.production.example
+!deploy/.env.mobile-e2e.example
 .envrc
 .venv
 env/
