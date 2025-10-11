@@ -1,0 +1,35 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() { return request.auth != null; }
+    function uid() { return request.auth.uid; }
+    // Membership: top-level groupMembers/{groupId}:{userId}
+    function isGroupMember(groupId) {
+      return isSignedIn() && exists(/databases/$(database)/documents/groupMembers/$(groupId + ':' + uid()));
+    }
+
+    // Groups
+    match /groups/{groupId} {
+      allow read: if isGroupMember(groupId);
+      // Client writes are restricted; use Cloud Functions
+      allow write: if false;
+    }
+
+    // Group messages
+    match /groupMessages/{groupId}/messages/{messageId} {
+      allow read: if isGroupMember(groupId);
+      // Client writes are restricted; use Cloud Functions
+      allow write: if false;
+    }
+
+    // Group membership documents
+    match /groupMembers/{docId} {
+      // Allow users to read their own membership records
+      allow read: if isSignedIn() && resource.data.userId == uid();
+      allow write: if false;
+    }
+
+    // Presence/Proposals rules are implemented in FB.2.2/FB.2.3 tasks
+  }
+}
