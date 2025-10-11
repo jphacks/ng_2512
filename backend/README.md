@@ -1,28 +1,20 @@
-# Backend Docker Targets
+# Backend Service
 
-このディレクトリの Dockerfile は Flask バックエンドのテスト/本番コンテナをマルチステージで提供します。
+## Run with Docker
 
-## 事前準備
-- ルートで `cp .env.example .env` などの環境設定を行う前提です。
-- テストステージでは `pytest` を実行し、プロダクションステージでは Gunicorn を起動します。
-
-## イメージのビルドと実行例
-
-### テストターゲット
 ```bash
-docker build -f backend/Dockerfile --target test -t recall-backend:test .
-docker run --rm recall-backend:test
+docker build -t ng-backend ./backend
+docker run --rm -p 8000:8000 ng-backend
 ```
 
-### プロダクションターゲット
+The application exposes a FastAPI health check at `http://localhost:8000/health`.
+
+## Run with Docker Compose
+
 ```bash
-docker build -f backend/Dockerfile --target prod -t recall-backend:prod .
-docker run --rm -p 8000:8000 recall-backend:prod
+docker compose up --build backend
 ```
 
-## ローカル開発ノート
-- Gunicorn は `backend.app:create_app()` をエントリポイントとしており、ポート `8000` で待ち受けます。
-- `tests/` 配下に pytest スモークテストがあり、テストターゲットで自動実行されます。
-- 依存インストールは wheel を事前構築してキャッシュし、テスト/プロダクションで再利用します。
-- `scripts/wait_for_dependencies.py` は docker-compose.test から依存サービスの待機に利用しています。
-- `docker-compose.test.yml` は `.env.test` から DB/Redis/vLLM の接続情報を読み込みます。
+This uses the root-level `docker-compose.yml` to build the same image and publish `http://localhost:8000/health`.
+
+Dependencies for the container are pinned in `backend/requirements.txt` to match the FastAPI service.

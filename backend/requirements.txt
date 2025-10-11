@@ -1,6 +1,5 @@
-Flask==3.0.3
-gunicorn==21.2.0
-pytest==8.3.3
-SQLAlchemy==2.0.32
+fastapi==0.112.2
 pgvector==0.2.5
 psycopg[binary]==3.1.19
+sqlalchemy==2.0.32
+uvicorn==0.30.6

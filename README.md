@@ -1,4 +1,4 @@
-# Recall プロトタイプ（ローカル開発ガイド）
+### Recall プロトタイプ（ローカル開発ガイド）
 
 このリポジトリは以下のコンポーネントで構成されたプロトタイプです。
 - Firebase（Firestore/Functions/Auth/Emulator）
