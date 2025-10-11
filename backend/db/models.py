@@ -15,6 +15,14 @@ except Exception:  # pragma: no cover
     from sqlalchemy.types import JSON as JSONB  # type: ignore
 
 
+class User(Base):
+    """Minimal user shadow table for FK resolution in metadata."""
+
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+
+
 class Asset(Base):
     """Object storage asset metadata."""
 
@@ -248,6 +256,7 @@ class JournalEntryTag(Base):
 
 
 __all__ = [
+    "User",
     "Asset",
     "ImageEmbedding",
     "FaceEmbedding",
