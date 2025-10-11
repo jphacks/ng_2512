@@ -101,12 +101,12 @@ export default function AlbumScreen() {
     // アルバム詳細画面への遷移
     router.push({
       pathname: "/album/[id]",
-      params: { id: album.id }
+      params: { id: album.id },
     });
   };
 
   const renderAlbumCard = ({ item }: { item: Album }) => (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={styles.albumCard}
       onPress={() => handleAlbumPress(item)}
     >
@@ -247,7 +247,12 @@ export default function AlbumScreen() {
         presentationStyle="pageSheet"
         onRequestClose={() => setCreateAlbumVisible(false)}
       >
-        <SafeAreaView style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+        <SafeAreaView
+          style={[
+            styles.modalContainer,
+            { backgroundColor: colors.background },
+          ]}
+        >
           <View style={styles.modalHeader}>
             <Text style={[styles.modalTitle, { color: colors.text }]}>
               新しいアルバムを作成
@@ -260,7 +265,10 @@ export default function AlbumScreen() {
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+          <ScrollView
+            style={styles.modalBody}
+            showsVerticalScrollIndicator={false}
+          >
             {/* Album Title Input */}
             <View style={styles.inputSection}>
               <View style={styles.labelContainer}>
@@ -299,9 +307,7 @@ export default function AlbumScreen() {
                 ]}
               >
                 <IconSymbol name="photo" size={16} color={colors.text} />
-                <Text
-                  style={[styles.uploadButtonText, { color: colors.text }]}
-                >
+                <Text style={[styles.uploadButtonText, { color: colors.text }]}>
                   写真を追加
                 </Text>
               </TouchableOpacity>
@@ -323,7 +329,7 @@ export default function AlbumScreen() {
                   { borderColor: colors.border },
                 ]}
               >
-                <ScrollView 
+                <ScrollView
                   style={styles.userList}
                   showsVerticalScrollIndicator={true}
                   nestedScrollEnabled={true}
@@ -334,9 +340,18 @@ export default function AlbumScreen() {
                       style={styles.userItem}
                       onPress={() => toggleUserSelection(item.id)}
                     >
-                      <View style={[styles.checkbox, item.selected && styles.checkboxSelected]}>
+                      <View
+                        style={[
+                          styles.checkbox,
+                          item.selected && styles.checkboxSelected,
+                        ]}
+                      >
                         {item.selected && (
-                          <IconSymbol name="checkmark" size={12} color={colors.tint} />
+                          <IconSymbol
+                            name="checkmark"
+                            size={12}
+                            color={colors.tint}
+                          />
                         )}
                       </View>
                       <View style={styles.userInfo}>
@@ -348,10 +363,7 @@ export default function AlbumScreen() {
                 </ScrollView>
               </View>
               <Text
-                style={[
-                  styles.selectedCount,
-                  { color: colors.textSecondary },
-                ]}
+                style={[styles.selectedCount, { color: colors.textSecondary }]}
               >
                 {getSelectedCount()}人選択中
               </Text>

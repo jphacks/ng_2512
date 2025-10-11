@@ -43,18 +43,66 @@ export default function AlbumDetailScreen() {
 
   // Sample photos data
   const [photos, setPhotos] = useState<Photo[]>([
-    { id: "1", uri: "https://picsum.photos/200/200?random=1", isSelected: false },
-    { id: "2", uri: "https://picsum.photos/200/200?random=2", isSelected: false },
-    { id: "3", uri: "https://picsum.photos/200/200?random=3", isSelected: false },
-    { id: "4", uri: "https://picsum.photos/200/200?random=4", isSelected: false },
-    { id: "5", uri: "https://picsum.photos/200/200?random=5", isSelected: false },
-    { id: "6", uri: "https://picsum.photos/200/200?random=6", isSelected: false },
-    { id: "7", uri: "https://picsum.photos/200/200?random=7", isSelected: false },
-    { id: "8", uri: "https://picsum.photos/200/200?random=8", isSelected: false },
-    { id: "9", uri: "https://picsum.photos/200/200?random=9", isSelected: false },
-    { id: "10", uri: "https://picsum.photos/200/200?random=10", isSelected: false },
-    { id: "11", uri: "https://picsum.photos/200/200?random=11", isSelected: false },
-    { id: "12", uri: "https://picsum.photos/200/200?random=12", isSelected: false },
+    {
+      id: "1",
+      uri: "https://picsum.photos/200/200?random=1",
+      isSelected: false,
+    },
+    {
+      id: "2",
+      uri: "https://picsum.photos/200/200?random=2",
+      isSelected: false,
+    },
+    {
+      id: "3",
+      uri: "https://picsum.photos/200/200?random=3",
+      isSelected: false,
+    },
+    {
+      id: "4",
+      uri: "https://picsum.photos/200/200?random=4",
+      isSelected: false,
+    },
+    {
+      id: "5",
+      uri: "https://picsum.photos/200/200?random=5",
+      isSelected: false,
+    },
+    {
+      id: "6",
+      uri: "https://picsum.photos/200/200?random=6",
+      isSelected: false,
+    },
+    {
+      id: "7",
+      uri: "https://picsum.photos/200/200?random=7",
+      isSelected: false,
+    },
+    {
+      id: "8",
+      uri: "https://picsum.photos/200/200?random=8",
+      isSelected: false,
+    },
+    {
+      id: "9",
+      uri: "https://picsum.photos/200/200?random=9",
+      isSelected: false,
+    },
+    {
+      id: "10",
+      uri: "https://picsum.photos/200/200?random=10",
+      isSelected: false,
+    },
+    {
+      id: "11",
+      uri: "https://picsum.photos/200/200?random=11",
+      isSelected: false,
+    },
+    {
+      id: "12",
+      uri: "https://picsum.photos/200/200?random=12",
+      isSelected: false,
+    },
   ]);
 
   // Sample users data
@@ -184,7 +232,12 @@ export default function AlbumDetailScreen() {
         presentationStyle="pageSheet"
         onRequestClose={() => setShowSettingsModal(false)}
       >
-        <SafeAreaView style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+        <SafeAreaView
+          style={[
+            styles.modalContainer,
+            { backgroundColor: colors.background },
+          ]}
+        >
           {/* Modal Header */}
           <View style={styles.modalHeader}>
             <View style={styles.modalHeaderContent}>
@@ -216,10 +269,7 @@ export default function AlbumDetailScreen() {
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[
-                styles.tab,
-                activeTab === "sharing" && styles.activeTab,
-              ]}
+              style={[styles.tab, activeTab === "sharing" && styles.activeTab]}
               onPress={() => setActiveTab("sharing")}
             >
               <Text
@@ -233,99 +283,118 @@ export default function AlbumDetailScreen() {
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
-              {activeTab === "sharing" && (
-                <View style={styles.tabContent}>
-                  <Text style={[styles.sectionLabel, { color: colors.text }]}>
-                    共有するユーザー
-                  </Text>
-                  <View
-                    style={[
-                      styles.userListContainer,
-                      { borderColor: colors.border },
-                    ]}
-                  >
-                    <ScrollView 
-                      style={styles.userList}
-                      showsVerticalScrollIndicator={true}
-                      nestedScrollEnabled={true}
-                    >
-                      {users.map((item) => (
-                        <TouchableOpacity
-                          key={item.id}
-                          style={styles.userItem}
-                          onPress={() => handleUserToggle(item.id)}
-                        >
-                          <View
-                            style={[
-                              styles.checkbox,
-                              {
-                                backgroundColor: item.isSelected ? "#030213" : "#f3f3f5",
-                                borderColor: item.isSelected ? "#030213" : "rgba(0,0,0,0.1)",
-                              },
-                            ]}
-                          >
-                            {item.isSelected && (
-                              <IconSymbol name="checkmark" size={14} color="white" />
-                            )}
-                          </View>
-                          <View style={styles.userInfo}>
-                            <Text style={[styles.userName, { color: colors.text }]}>
-                              {item.name}
-                            </Text>
-                            <Text style={styles.userHandle}>{item.username}</Text>
-                          </View>
-                        </TouchableOpacity>
-                      ))}
-                    </ScrollView>
-                  </View>
-                  <Text
-                    style={[styles.selectedCount, { color: colors.textSecondary }]}
-                  >
-                    {selectedUserCount}人選択中
-                  </Text>
-                </View>
-              )}
-
-              {activeTab === "title" && (
-                <View style={styles.tabContent}>
-                  <Text style={[styles.sectionLabel, { color: colors.text }]}>
-                    アルバムタイトル
-                  </Text>
-                  <View
-                    style={[
-                      styles.titleInputContainer,
-                      { borderColor: colors.border },
-                    ]}
-                  >
-                    <Text style={[styles.titleInput, { color: colors.text }]}>
-                      {albumTitle}
-                    </Text>
-                  </View>
-                </View>
-              )}
-            </ScrollView>
-
-            {/* Action Buttons */}
-            <View style={styles.actionButtons}>
-              <TouchableOpacity
-                style={[
-                  styles.cancelButton,
-                  { borderColor: colors.border, backgroundColor: colors.background },
-                ]}
-                onPress={() => setShowSettingsModal(false)}
-              >
-                <Text style={[styles.cancelButtonText, { color: colors.text }]}>
-                  キャンセル
+          <ScrollView
+            style={styles.modalBody}
+            showsVerticalScrollIndicator={false}
+          >
+            {activeTab === "sharing" && (
+              <View style={styles.tabContent}>
+                <Text style={[styles.sectionLabel, { color: colors.text }]}>
+                  共有するユーザー
                 </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.saveButton}
-                onPress={handleSaveSettings}
-              >
-                <Text style={styles.saveButtonText}>保存</Text>
-              </TouchableOpacity>
-            </View>
+                <View
+                  style={[
+                    styles.userListContainer,
+                    { borderColor: colors.border },
+                  ]}
+                >
+                  <ScrollView
+                    style={styles.userList}
+                    showsVerticalScrollIndicator={true}
+                    nestedScrollEnabled={true}
+                  >
+                    {users.map((item) => (
+                      <TouchableOpacity
+                        key={item.id}
+                        style={styles.userItem}
+                        onPress={() => handleUserToggle(item.id)}
+                      >
+                        <View
+                          style={[
+                            styles.checkbox,
+                            {
+                              backgroundColor: item.isSelected
+                                ? "#030213"
+                                : "#f3f3f5",
+                              borderColor: item.isSelected
+                                ? "#030213"
+                                : "rgba(0,0,0,0.1)",
+                            },
+                          ]}
+                        >
+                          {item.isSelected && (
+                            <IconSymbol
+                              name="checkmark"
+                              size={14}
+                              color="white"
+                            />
+                          )}
+                        </View>
+                        <View style={styles.userInfo}>
+                          <Text
+                            style={[styles.userName, { color: colors.text }]}
+                          >
+                            {item.name}
+                          </Text>
+                          <Text style={styles.userHandle}>{item.username}</Text>
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+                <Text
+                  style={[
+                    styles.selectedCount,
+                    { color: colors.textSecondary },
+                  ]}
+                >
+                  {selectedUserCount}人選択中
+                </Text>
+              </View>
+            )}
+
+            {activeTab === "title" && (
+              <View style={styles.tabContent}>
+                <Text style={[styles.sectionLabel, { color: colors.text }]}>
+                  アルバムタイトル
+                </Text>
+                <View
+                  style={[
+                    styles.titleInputContainer,
+                    { borderColor: colors.border },
+                  ]}
+                >
+                  <Text style={[styles.titleInput, { color: colors.text }]}>
+                    {albumTitle}
+                  </Text>
+                </View>
+              </View>
+            )}
+          </ScrollView>
+
+          {/* Action Buttons */}
+          <View style={styles.actionButtons}>
+            <TouchableOpacity
+              style={[
+                styles.cancelButton,
+                {
+                  borderColor: colors.border,
+                  backgroundColor: colors.background,
+                },
+              ]}
+              onPress={() => setShowSettingsModal(false)}
+            >
+              <Text style={[styles.cancelButtonText, { color: colors.text }]}>
+                キャンセル
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.saveButton}
+              onPress={handleSaveSettings}
+            >
+              <Text style={styles.saveButtonText}>保存</Text>
+            </TouchableOpacity>
+          </View>
         </SafeAreaView>
       </Modal>
     </SafeAreaView>
