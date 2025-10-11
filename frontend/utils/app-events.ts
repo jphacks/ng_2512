@@ -11,12 +11,12 @@ class SimpleEventEmitter {
 
   off(event: string, listener: Function) {
     if (!this.listeners[event]) return;
-    this.listeners[event] = this.listeners[event].filter(l => l !== listener);
+    this.listeners[event] = this.listeners[event].filter((l) => l !== listener);
   }
 
   emit(event: string, ...args: any[]) {
     if (!this.listeners[event]) return;
-    this.listeners[event].forEach(listener => listener(...args));
+    this.listeners[event].forEach((listener) => listener(...args));
   }
 
   removeAllListeners(event?: string) {
