@@ -44,6 +44,59 @@ service cloud.firestore {
       allow delete: if isSignedIn() && request.auth.uid == userId;
     }
 
-    // Proposals rules are implemented in FB.2.2 task
+    // Proposals
+    function getProposal(proposalId) {
+      return get(/databases/$(database)/documents/proposals/$(proposalId)).data;
+    }
+    function isProposer(proposalId) {
+      return isSignedIn() && getProposal(proposalId).proposerId == uid();
+    }
+    function isAudience(proposalId) {
+      return isSignedIn() && uid() in getProposal(proposalId).audienceIds;
+    }
+    function isDraft(proposalId) {
+      return getProposal(proposalId).status == 'draft';
+    }
+
+    // Top-level proposals document
+    match /proposals/{proposalId} {
+      // Readable by proposer always; audiences only after draft is sent
+      allow read: if isSignedIn() && (
+        isProposer(proposalId) || (!isDraft(proposalId) && isAudience(proposalId))
+      );
+      // Client writes are restricted; use Cloud Functions for lifecycle
+      allow write: if false;
+    }
+
+    // audiences subcollection under a proposal
+    match /proposals/{proposalId}/audiences/{userId} {
+      // Proposer can read all; audience can read own entry only after draft
+      allow read: if isSignedIn() && (
+        isProposer(proposalId) || (!isDraft(proposalId) && userId == uid())
+      );
+      // Only the audience user can update their own reaction fields once visible
+      allow update: if isSignedIn() && userId == uid() && !isDraft(proposalId) &&
+        // restrict editable fields to reaction/reactedAt
+        request.resource.data.keys().hasOnly(['role','reaction','reactedAt']) &&
+        resource.data.role == request.resource.data.role &&
+        (request.resource.data.reaction == null || request.resource.data.reaction in ['like','dislike']) &&
+        (request.resource.data.reactedAt == null || request.resource.data.reactedAt is timestamp);
+      // Creation/deletion of audience docs is managed by backend
+      allow create, delete: if false;
+    }
+
+    // slots subcollection under a proposal
+    match /proposals/{proposalId}/slots/{slotId} {
+      // Visible to proposer and audiences (not during draft)
+      allow read: if isSignedIn() && (
+        isProposer(proposalId) || (!isDraft(proposalId) && isAudience(proposalId))
+      );
+      // Only proposer may modify slots while proposal is pending
+      allow create, update, delete: if isSignedIn() && isProposer(proposalId) && getProposal(proposalId).status == 'pending' &&
+        request.resource.data.keys().hasOnly(['start','end','timezone']) &&
+        (request.resource.data.start is timestamp) &&
+        (request.resource.data.end is timestamp) &&
+        (request.resource.data.timezone is string);
+    }
   }
 }
