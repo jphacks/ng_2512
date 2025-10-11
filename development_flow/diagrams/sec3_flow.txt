@@ -1,0 +1,29 @@
+SEC.3 Signed URL & Retention — Flow
+
+Upload (PUT)
+
+RN (user)           Functions                  S3 (bucket)
+   | 1. request signed PUT URL  ->  |              |
+   |                               | 2. validate user, path, limits
+   |                               | 3. generate presigned PUT (90s)
+   | <- 4. URL, headers, key ----- |              |
+   | 5. PUT object  --------------> | ----------> | create object
+   |                                 6. metadata: owner, origin, SSE
+   | 7. create asset doc (Firestore)             |
+
+Delete (User initiated)
+
+RN (user)           Firestore/Functions         S3 (bucket)
+   | 1. mark asset.deleted=true -> |              |
+   |                               | 2. onWrite triggers delete
+   |                               | ----------> | DeleteObject
+   |                               | 3. record deletedAt / audit
+
+Garbage collection (orphan)
+
+Cron/Job             Firestore/Functions         S3 (bucket)
+   | 1. list objects (prefix=user)  |            |
+   | 2. check references (assets)   |            |
+   | 3. delete unreferenced   ----> | ----------> | DeleteObject
+   | 4. retry with backoff, 7 days window
+
