@@ -53,7 +53,7 @@ def predecessors(edges: List[Tuple[str, str]]) -> Dict[str, Set[str]]:
 
 def load_status(nodes: Set[str]) -> Dict[str, str]:
     if STATUS_JSON.exists():
-        data = json.loads(STATUS_JSON.read_text())
+        data = json.loads(STATUS_JSON.read_text(encoding='utf-8'))
     else:
         data = {}
     # initialize new nodes to pending (exclude FIN)
@@ -67,7 +67,7 @@ def load_status(nodes: Set[str]) -> Dict[str, str]:
         if n not in nodes:
             del data[n]
     STATUS_JSON.parent.mkdir(parents=True, exist_ok=True)
-    STATUS_JSON.write_text(json.dumps(data, ensure_ascii=False, indent=2))
+    STATUS_JSON.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding='utf-8')
     return data
 
 
@@ -132,9 +132,9 @@ def render_with_status(dot_text: str, status: Dict[str, str], ready: Set[str]) -
 
 def load_base_dot() -> str:
     if BASE_PRIMARY.exists():
-        return BASE_PRIMARY.read_text()
+        return BASE_PRIMARY.read_text(encoding='utf-8')
     if BASE_FALLBACK.exists():
-        return BASE_FALLBACK.read_text()
+        return BASE_FALLBACK.read_text(encoding='utf-8')
     raise SystemExit('adm.dot not found (expected adm.dot or development_flow/adm.dot)')
 
 
@@ -190,7 +190,7 @@ def cmd_status():
     ready = assignable(pred, status)
     # write colored dot
     OUT_DOT.parent.mkdir(parents=True, exist_ok=True)
-    OUT_DOT.write_text(render_with_status(dot, status, set(ready)))
+    OUT_DOT.write_text(render_with_status(dot, status, set(ready)), encoding='utf-8')
     print('Assignable tasks:')
     for n in ready:
         print('-', n)
@@ -208,12 +208,12 @@ def cmd_mark(task_id: str, new_status: str):
     if task_id not in status:
         raise SystemExit(f'Unknown task id: {task_id}')
     status[task_id] = new_status
-    STATUS_JSON.write_text(json.dumps(status, ensure_ascii=False, indent=2))
+    STATUS_JSON.write_text(json.dumps(status, ensure_ascii=False, indent=2), encoding='utf-8')
     # recompute readiness and render
     pred = predecessors(edges)
     ready = assignable(pred, status)
     OUT_DOT.parent.mkdir(parents=True, exist_ok=True)
-    OUT_DOT.write_text(render_with_status(dot, status, set(ready)))
+    OUT_DOT.write_text(render_with_status(dot, status, set(ready)), encoding='utf-8')
     print(f'Updated {task_id} -> {new_status}')
     print(f'Wrote colored DOT: {OUT_DOT}')
 
