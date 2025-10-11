@@ -9,6 +9,7 @@ import {
   Alert,
   Animated,
   Dimensions,
+  Modal,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -34,7 +35,15 @@ const mockFriends: Friend[] = [
   { id: "6", name: "渡辺さくら" },
 ];
 
-export default function CreateProposalScreen() {
+interface CreateProposalProps {
+  visible: boolean;
+  onClose: () => void;
+}
+
+export default function CreateProposalScreen({
+  visible,
+  onClose,
+}: CreateProposalProps) {
   const [title, setTitle] = useState("");
   const [datetime, setDatetime] = useState("");
   const [location, setLocation] = useState("");
@@ -88,10 +97,14 @@ export default function CreateProposalScreen() {
         text: "OK",
         onPress: () => {
           // ここで実際の作成処理を行う
-          router.back(); // 前の画面に戻る
+          onClose();
         },
       },
     ]);
+  };
+
+  const closeModal = () => {
+    onClose();
   };
 
   const handleAIGenerate = () => {
@@ -104,275 +117,326 @@ export default function CreateProposalScreen() {
   };
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: colors.surfaceSecondary }]}
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={closeModal}
     >
-      <View
-        style={[
-          styles.header,
-          { backgroundColor: colors.surface, borderBottomColor: colors.border },
-        ]}
+      <SafeAreaView
+        style={[styles.modalContainer, { backgroundColor: colors.background }]}
       >
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <IconSymbol name="chevron.left" size={24} color={colors.primary} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>
-          提案を作成
-        </Text>
-        <TouchableOpacity style={styles.aiButton} onPress={handleAIGenerate}>
-          <IconSymbol name="wand.and.stars" size={20} color={colors.primary} />
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <Animated.View
-          style={{
-            opacity: fadeAnim,
-            transform: [{ translateY: slideAnim }],
-          }}
-        >
-          <View
-            style={[
-              styles.section,
-              styles.formCard,
-              { backgroundColor: colors.surface },
-            ]}
-          >
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              <IconSymbol name="pencil" size={20} color={colors.primary} />{" "}
-              タイトル
+        {/* Modal Header */}
+        <View style={styles.modalHeader}>
+          <View style={styles.modalHeaderContent}>
+            <TouchableOpacity style={styles.closeButton} onPress={closeModal}>
+              <IconSymbol name="xmark" size={18} color={colors.text} />
+            </TouchableOpacity>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>
+              提案を作成
             </Text>
-            <TextInput
-              style={[
-                styles.textInput,
-                {
-                  backgroundColor: colors.surfaceSecondary,
-                  borderColor: colors.border,
-                  color: colors.text,
-                },
-              ]}
-              value={title}
-              onChangeText={setTitle}
-              placeholder="例: 新宿でカフェ巡り"
-              placeholderTextColor={colors.placeholder}
-            />
+            <View style={styles.headerSpacer} />
           </View>
+        </View>
 
-          <View
+        {/* AI Generate Button */}
+        <View style={styles.aiGenerateContainer}>
+          <TouchableOpacity
             style={[
-              styles.section,
-              styles.formCard,
-              { backgroundColor: colors.surface },
+              styles.aiGenerateButton,
+              { backgroundColor: colors.primary },
             ]}
+            onPress={handleAIGenerate}
           >
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              <IconSymbol name="calendar" size={20} color={colors.accent} />{" "}
-              日時候補
-            </Text>
-            <TextInput
-              style={[
-                styles.textInput,
-                {
-                  backgroundColor: colors.surfaceSecondary,
-                  borderColor: colors.border,
-                  color: colors.text,
-                },
-              ]}
-              value={datetime}
-              onChangeText={setDatetime}
-              placeholder="例: 10月15日 14:00〜"
-              placeholderTextColor={colors.placeholder}
-            />
-          </View>
+            <IconSymbol name="wand.and.stars" size={20} color="#fff" />
+            <Text style={styles.aiGenerateText}>AIで提案を生成</Text>
+          </TouchableOpacity>
+        </View>
 
-          <View
-            style={[
-              styles.section,
-              styles.formCard,
-              { backgroundColor: colors.surface },
-            ]}
-          >
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              <IconSymbol name="location" size={20} color={colors.secondary} />{" "}
-              場所
-            </Text>
-            <TextInput
-              style={[
-                styles.textInput,
-                {
-                  backgroundColor: colors.surfaceSecondary,
-                  borderColor: colors.border,
-                  color: colors.text,
-                },
-              ]}
-              value={location}
-              onChangeText={setLocation}
-              placeholder="例: 新宿駅周辺"
-              placeholderTextColor={colors.placeholder}
-            />
-          </View>
-        </Animated.View>
-
-        <Animated.View
-          style={{
-            opacity: fadeAnim,
-            transform: [{ translateY: slideAnim }],
-          }}
+        <ScrollView
+          style={styles.modalBody}
+          showsVerticalScrollIndicator={false}
         >
-          <View
-            style={[
-              styles.section,
-              styles.formCard,
-              { backgroundColor: colors.surface },
-            ]}
+          <Animated.View
+            style={{
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }],
+            }}
           >
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              <IconSymbol name="person.2" size={20} color={colors.warning} />{" "}
-              参加者を選択
-            </Text>
-            <TextInput
+            <View
               style={[
-                styles.textInput,
-                styles.searchInput,
-                {
-                  backgroundColor: colors.surfaceSecondary,
-                  borderColor: colors.border,
-                  color: colors.text,
-                },
+                styles.section,
+                styles.formCard,
+                { backgroundColor: colors.surface },
               ]}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              placeholder="フレンドを検索..."
-              placeholderTextColor={colors.placeholder}
-            />
-            <View style={styles.friendsList}>
-              {filteredFriends.map((friend) => (
-                <TouchableOpacity
-                  key={friend.id}
-                  style={[
-                    styles.friendItem,
-                    {
-                      backgroundColor: colors.surfaceSecondary,
-                      borderColor: colors.border,
-                    },
-                  ]}
-                  onPress={() => toggleFriendSelection(friend.id)}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.friendInfo}>
-                    <View
-                      style={[
-                        styles.avatar,
-                        { backgroundColor: colors.primary },
-                      ]}
-                    >
-                      <Text style={styles.avatarText}>
-                        {friend.name.charAt(0)}
-                      </Text>
-                    </View>
-                    <Text style={[styles.friendName, { color: colors.text }]}>
-                      {friend.name}
-                    </Text>
-                  </View>
-                  <View
+            >
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                <IconSymbol name="pencil" size={20} color={colors.primary} />{" "}
+                タイトル
+              </Text>
+              <TextInput
+                style={[
+                  styles.textInput,
+                  {
+                    backgroundColor: colors.surfaceSecondary,
+                    borderColor: colors.border,
+                    color: colors.text,
+                  },
+                ]}
+                value={title}
+                onChangeText={setTitle}
+                placeholder="例: 新宿でカフェ巡り"
+                placeholderTextColor={colors.placeholder}
+              />
+            </View>
+
+            <View
+              style={[
+                styles.section,
+                styles.formCard,
+                { backgroundColor: colors.surface },
+              ]}
+            >
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                <IconSymbol name="calendar" size={20} color={colors.accent} />{" "}
+                日時候補
+              </Text>
+              <TextInput
+                style={[
+                  styles.textInput,
+                  {
+                    backgroundColor: colors.surfaceSecondary,
+                    borderColor: colors.border,
+                    color: colors.text,
+                  },
+                ]}
+                value={datetime}
+                onChangeText={setDatetime}
+                placeholder="例: 10月15日 14:00〜"
+                placeholderTextColor={colors.placeholder}
+              />
+            </View>
+
+            <View
+              style={[
+                styles.section,
+                styles.formCard,
+                { backgroundColor: colors.surface },
+              ]}
+            >
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                <IconSymbol
+                  name="location"
+                  size={20}
+                  color={colors.secondary}
+                />{" "}
+                場所
+              </Text>
+              <TextInput
+                style={[
+                  styles.textInput,
+                  {
+                    backgroundColor: colors.surfaceSecondary,
+                    borderColor: colors.border,
+                    color: colors.text,
+                  },
+                ]}
+                value={location}
+                onChangeText={setLocation}
+                placeholder="例: 新宿駅周辺"
+                placeholderTextColor={colors.placeholder}
+              />
+            </View>
+          </Animated.View>
+
+          <Animated.View
+            style={{
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }],
+            }}
+          >
+            <View
+              style={[
+                styles.section,
+                styles.formCard,
+                { backgroundColor: colors.surface },
+              ]}
+            >
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                <IconSymbol name="person.2" size={20} color={colors.warning} />{" "}
+                参加者を選択
+              </Text>
+              <TextInput
+                style={[
+                  styles.textInput,
+                  styles.searchInput,
+                  {
+                    backgroundColor: colors.surfaceSecondary,
+                    borderColor: colors.border,
+                    color: colors.text,
+                  },
+                ]}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder="フレンドを検索..."
+                placeholderTextColor={colors.placeholder}
+              />
+              <View style={styles.friendsList}>
+                {filteredFriends.map((friend) => (
+                  <TouchableOpacity
+                    key={friend.id}
                     style={[
-                      styles.checkbox,
+                      styles.friendItem,
                       {
-                        borderColor: selectedFriends.includes(friend.id)
-                          ? colors.primary
-                          : colors.border,
-                      },
-                      selectedFriends.includes(friend.id) && {
-                        backgroundColor: colors.primary,
+                        backgroundColor: colors.surfaceSecondary,
+                        borderColor: colors.border,
                       },
                     ]}
+                    onPress={() => toggleFriendSelection(friend.id)}
+                    activeOpacity={0.7}
                   >
-                    {selectedFriends.includes(friend.id) && (
-                      <IconSymbol name="checkmark" size={16} color="#fff" />
-                    )}
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        </Animated.View>
-
-        {selectedFriends.length > 0 && (
-          <View style={styles.selectedSection}>
-            <Text style={styles.selectedTitle}>
-              選択された参加者 ({selectedFriends.length}人)
-            </Text>
-            <View style={styles.selectedFriends}>
-              {selectedFriends.map((friendId) => {
-                const friend = mockFriends.find((f) => f.id === friendId);
-                return (
-                  <View key={friendId} style={styles.selectedFriend}>
-                    <Text style={styles.selectedFriendName}>
-                      {friend?.name}
-                    </Text>
-                    <TouchableOpacity
-                      onPress={() => toggleFriendSelection(friendId)}
+                    <View style={styles.friendInfo}>
+                      <View
+                        style={[
+                          styles.avatar,
+                          { backgroundColor: colors.primary },
+                        ]}
+                      >
+                        <Text style={styles.avatarText}>
+                          {friend.name.charAt(0)}
+                        </Text>
+                      </View>
+                      <Text style={[styles.friendName, { color: colors.text }]}>
+                        {friend.name}
+                      </Text>
+                    </View>
+                    <View
+                      style={[
+                        styles.checkbox,
+                        {
+                          borderColor: selectedFriends.includes(friend.id)
+                            ? colors.primary
+                            : colors.border,
+                        },
+                        selectedFriends.includes(friend.id) && {
+                          backgroundColor: colors.primary,
+                        },
+                      ]}
                     >
-                      <IconSymbol name="xmark" size={16} color="#666" />
-                    </TouchableOpacity>
-                  </View>
-                );
-              })}
+                      {selectedFriends.includes(friend.id) && (
+                        <IconSymbol name="checkmark" size={16} color="#fff" />
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
-          </View>
-        )}
-      </ScrollView>
+          </Animated.View>
 
-      <View
-        style={[
-          styles.footer,
-          { backgroundColor: colors.surface, borderTopColor: colors.border },
-        ]}
-      >
-        <TouchableOpacity
-          style={[styles.createButton, { backgroundColor: colors.primary }]}
-          onPress={handleCreate}
-          activeOpacity={0.8}
-        >
-          <IconSymbol name="plus" size={20} color="#fff" />
-          <Text style={styles.createButtonText}>提案を作成</Text>
-        </TouchableOpacity>
-      </View>
-    </SafeAreaView>
+          {selectedFriends.length > 0 && (
+            <View style={styles.selectedSection}>
+              <Text style={styles.selectedTitle}>
+                選択された参加者 ({selectedFriends.length}人)
+              </Text>
+              <View style={styles.selectedFriends}>
+                {selectedFriends.map((friendId) => {
+                  const friend = mockFriends.find((f) => f.id === friendId);
+                  return (
+                    <View key={friendId} style={styles.selectedFriend}>
+                      <Text style={styles.selectedFriendName}>
+                        {friend?.name}
+                      </Text>
+                      <TouchableOpacity
+                        onPress={() => toggleFriendSelection(friendId)}
+                      >
+                        <IconSymbol name="xmark" size={16} color="#666" />
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+        </ScrollView>
+
+        {/* Footer */}
+        <View style={styles.actionButtons}>
+          <TouchableOpacity
+            style={[styles.createButton, { backgroundColor: colors.primary }]}
+            onPress={handleCreate}
+            activeOpacity={0.8}
+          >
+            <IconSymbol name="plus" size={20} color="#fff" />
+            <Text style={styles.createButtonText}>提案を作成</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  modalContainer: {
     flex: 1,
+    backgroundColor: "#ffffff",
   },
-  header: {
+  modalHeader: {
     flexDirection: "row",
+    justifyContent: "center",
     alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingVertical: 16,
     borderBottomWidth: 1,
+    borderBottomColor: "#E9ECEF",
   },
-  backButton: {
-    padding: 8,
-    borderRadius: 20,
+  modalHeaderContent: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    width: "100%",
   },
-  headerTitle: {
-    fontSize: 20,
+  modalTitle: {
+    fontSize: 18,
     fontWeight: "700",
-    letterSpacing: -0.3,
+    color: "#1E2939",
+    flex: 1,
+    textAlign: "center",
   },
-  aiButton: {
-    padding: 8,
-    borderRadius: 20,
+  closeButton: {
+    width: 32,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 16,
   },
-  content: {
+  headerSpacer: {
+    width: 32,
+  },
+  aiGenerateContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  aiGenerateButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    gap: 8,
+  },
+  aiGenerateText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  modalBody: {
     flex: 1,
     paddingHorizontal: 20,
+    paddingBottom: 16,
+  },
+  container: {
+    flex: 1,
   },
   section: {
     marginTop: 28,
@@ -486,28 +550,27 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#1976d2",
   },
-  footer: {
-    padding: 20,
-    backgroundColor: "#fff",
+  actionButtons: {
+    flexDirection: "row",
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 20,
     borderTopWidth: 1,
-    borderTopColor: "#e9ecef",
+    borderTopColor: "#E9ECEF",
   },
   createButton: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 16,
-    paddingVertical: 18,
+    borderRadius: 12,
+    paddingVertical: 12,
     gap: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
   },
   createButtonText: {
     color: "#fff",
-    fontSize: 18,
-    fontWeight: "700",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });

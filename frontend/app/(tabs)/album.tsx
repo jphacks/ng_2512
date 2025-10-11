@@ -254,15 +254,16 @@ export default function AlbumScreen() {
           ]}
         >
           <View style={styles.modalHeader}>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>
-              新しいアルバムを作成
-            </Text>
             <TouchableOpacity
               style={styles.closeButton}
               onPress={() => setCreateAlbumVisible(false)}
             >
               <IconSymbol name="xmark" size={16} color={colors.text} />
             </TouchableOpacity>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>
+              新しいアルバムを作成
+            </Text>
+            <View style={styles.headerSpacer} />
           </View>
 
           <ScrollView
@@ -601,6 +602,8 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "700",
     color: "#1E2939",
+    flex: 1,
+    textAlign: "center",
   },
   closeButton: {
     width: 32,
@@ -608,6 +611,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 8,
+  },
+  headerSpacer: {
+    width: 32,
   },
   modalBody: {
     flex: 1,

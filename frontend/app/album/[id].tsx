@@ -9,16 +9,19 @@ import {
   Image,
   StyleSheet,
   ScrollView,
+  Alert,
 } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Colors } from "@/constants/theme";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import * as ImagePicker from "expo-image-picker";
 
 interface Photo {
   id: string;
   uri: string;
   isSelected: boolean;
+  isUploading?: boolean;
 }
 
 interface User {
@@ -119,6 +122,11 @@ export default function AlbumDetailScreen() {
     { id: "10", name: "加藤さん", username: "@kato_k", isSelected: false },
   ]);
 
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [uploadingPhotos, setUploadingPhotos] = useState<Photo[]>([]);
+  const [showPhotoModal, setShowPhotoModal] = useState(false);
+  const [selectedPhotoUri, setSelectedPhotoUri] = useState<string>("");
+
   const selectedUserCount = users.filter((user) => user.isSelected).length;
 
   const handlePhotoPress = (photoId: string) => {
@@ -131,8 +139,106 @@ export default function AlbumDetailScreen() {
         )
       );
     } else {
-      // Navigate to photo detail view - placeholder for future implementation
-      console.log(`Navigate to photo ${photoId} in album ${id}`);
+      // 写真の全体表示
+      const photo = photos.find((p) => p.id === photoId);
+      if (photo) {
+        setSelectedPhotoUri(photo.uri);
+        setShowPhotoModal(true);
+      }
+    }
+  };
+
+  // 画像選択とアップロード機能
+  const requestPermissions = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert(
+        "権限が必要です",
+        "アルバムから写真を選択するために権限が必要です。"
+      );
+      return false;
+    }
+    return true;
+  };
+
+  const handleImageUpload = async (source: "camera" | "gallery") => {
+    const hasPermission = await requestPermissions();
+    if (!hasPermission) return;
+
+    try {
+      let result;
+
+      if (source === "camera") {
+        const cameraPermission =
+          await ImagePicker.requestCameraPermissionsAsync();
+        if (cameraPermission.status !== "granted") {
+          Alert.alert(
+            "権限が必要です",
+            "カメラを使用するために権限が必要です。"
+          );
+          return;
+        }
+
+        result = await ImagePicker.launchCameraAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          aspect: [1, 1],
+          quality: 0.8,
+        });
+      } else {
+        result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          aspect: [1, 1],
+          quality: 0.8,
+          allowsMultipleSelection: true,
+        });
+      }
+
+      if (!result.canceled && result.assets) {
+        setShowUploadModal(false);
+
+        // アップロード中の写真を即座に表示
+        const newUploadingPhotos = result.assets.map((asset, index) => ({
+          id: `uploading_${Date.now()}_${index}`,
+          uri: asset.uri,
+          isSelected: false,
+          isUploading: true,
+        }));
+
+        setUploadingPhotos(newUploadingPhotos);
+
+        // 実際のアップロード処理をシミュレート（各写真を1秒ずつ遅延）
+        for (let i = 0; i < newUploadingPhotos.length; i++) {
+          setTimeout(() => {
+            const uploadedPhoto = {
+              ...newUploadingPhotos[i],
+              id: `uploaded_${Date.now()}_${i}`,
+              isUploading: false,
+            };
+
+            // アップロード完了した写真を写真リストに追加
+            setPhotos((prev) => [uploadedPhoto, ...prev]);
+
+            // アップロード中リストから削除
+            setUploadingPhotos((prev) =>
+              prev.filter((photo) => photo.id !== newUploadingPhotos[i].id)
+            );
+
+            // 最後の写真のアップロードが完了したら通知
+            if (i === newUploadingPhotos.length - 1) {
+              Alert.alert(
+                "アップロード完了",
+                `${newUploadingPhotos.length}枚の写真がアップロードされました！`
+              );
+            }
+          }, (i + 1) * 1000);
+        }
+      }
+    } catch (error) {
+      console.error("画像選択エラー:", error);
+      Alert.alert("エラー", "画像の選択に失敗しました");
+      setUploadingPhotos([]);
     }
   };
 
@@ -158,9 +264,22 @@ export default function AlbumDetailScreen() {
         },
       ]}
       onPress={() => handlePhotoPress(item.id)}
+      disabled={item.isUploading}
     >
       <Image source={{ uri: item.uri }} style={styles.photo} />
-      {(selectionMode || item.isSelected) && (
+
+      {/* アップロード中のオーバーレイ */}
+      {item.isUploading && (
+        <View style={styles.uploadingOverlay}>
+          <View style={styles.uploadingSpinner}>
+            <IconSymbol name="arrow.clockwise" size={20} color="white" />
+          </View>
+          <Text style={styles.uploadingText}>アップロード中...</Text>
+        </View>
+      )}
+
+      {/* 選択状態のオーバーレイ */}
+      {(selectionMode || item.isSelected) && !item.isUploading && (
         <View
           style={[
             styles.selectionOverlay,
@@ -202,7 +321,10 @@ export default function AlbumDetailScreen() {
           </View>
         </View>
         <View style={styles.headerRight}>
-          <TouchableOpacity style={styles.addButton}>
+          <TouchableOpacity
+            style={styles.addButton}
+            onPress={() => setShowUploadModal(true)}
+          >
             <IconSymbol name="plus" size={16} color="white" />
             <Text style={styles.addButtonText}>追加</Text>
           </TouchableOpacity>
@@ -217,7 +339,7 @@ export default function AlbumDetailScreen() {
 
       {/* Photo Grid */}
       <FlatList
-        data={photos}
+        data={[...uploadingPhotos, ...photos]}
         renderItem={renderPhoto}
         numColumns={3}
         contentContainerStyle={styles.photoGrid}
@@ -397,6 +519,138 @@ export default function AlbumDetailScreen() {
           </View>
         </SafeAreaView>
       </Modal>
+
+      {/* Upload Modal */}
+      <Modal
+        visible={showUploadModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowUploadModal(false)}
+      >
+        <SafeAreaView
+          style={[
+            styles.modalContainer,
+            { backgroundColor: colors.background },
+          ]}
+        >
+          <View style={styles.modalHeader}>
+            <View style={styles.modalHeaderContent}>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={() => setShowUploadModal(false)}
+              >
+                <IconSymbol name="xmark" size={18} color={colors.text} />
+              </TouchableOpacity>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>
+                写真を追加
+              </Text>
+              <View style={styles.headerSpacer} />
+            </View>
+          </View>
+
+          <View style={styles.uploadOptions}>
+            <TouchableOpacity
+              style={[styles.uploadOption, { backgroundColor: colors.surface }]}
+              onPress={() => handleImageUpload("camera")}
+            >
+              <View
+                style={[
+                  styles.uploadIconContainer,
+                  { backgroundColor: colors.primary + "20" },
+                ]}
+              >
+                <IconSymbol name="camera" size={24} color={colors.primary} />
+              </View>
+              <View style={styles.uploadOptionText}>
+                <Text
+                  style={[styles.uploadOptionTitle, { color: colors.text }]}
+                >
+                  カメラで撮影
+                </Text>
+                <Text
+                  style={[
+                    styles.uploadOptionSubtitle,
+                    { color: colors.textSecondary },
+                  ]}
+                >
+                  新しい写真を撮影してアルバムに追加
+                </Text>
+              </View>
+              <IconSymbol
+                name="chevron.right"
+                size={16}
+                color={colors.textSecondary}
+              />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.uploadOption, { backgroundColor: colors.surface }]}
+              onPress={() => handleImageUpload("gallery")}
+            >
+              <View
+                style={[
+                  styles.uploadIconContainer,
+                  { backgroundColor: colors.accent + "20" },
+                ]}
+              >
+                <IconSymbol name="photo" size={24} color={colors.accent} />
+              </View>
+              <View style={styles.uploadOptionText}>
+                <Text
+                  style={[styles.uploadOptionTitle, { color: colors.text }]}
+                >
+                  ライブラリから選択
+                </Text>
+                <Text
+                  style={[
+                    styles.uploadOptionSubtitle,
+                    { color: colors.textSecondary },
+                  ]}
+                >
+                  複数の写真を一度に選択可能
+                </Text>
+              </View>
+              <IconSymbol
+                name="chevron.right"
+                size={16}
+                color={colors.textSecondary}
+              />
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </Modal>
+
+      {/* Photo Full View Modal */}
+      <Modal
+        visible={showPhotoModal}
+        animationType="fade"
+        presentationStyle="overFullScreen"
+        onRequestClose={() => setShowPhotoModal(false)}
+      >
+        <View style={styles.photoModalContainer}>
+          <TouchableOpacity
+            style={styles.photoModalBackground}
+            activeOpacity={1}
+            onPress={() => setShowPhotoModal(false)}
+          >
+            <View style={styles.photoModalHeader}>
+              <TouchableOpacity
+                style={styles.photoModalCloseButton}
+                onPress={() => setShowPhotoModal(false)}
+              >
+                <IconSymbol name="xmark" size={20} color="white" />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.photoModalImageContainer}>
+              <Image
+                source={{ uri: selectedPhotoUri }}
+                style={styles.photoModalImage}
+                resizeMode="contain"
+              />
+            </View>
+          </TouchableOpacity>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -480,6 +734,7 @@ const styles = StyleSheet.create({
   photo: {
     width: "100%",
     height: "100%",
+    resizeMode: "cover",
   },
   selectionOverlay: {
     position: "absolute",
@@ -682,5 +937,99 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "500",
     color: "white",
+  },
+  uploadingOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    borderRadius: 8,
+  },
+  uploadingSpinner: {
+    marginBottom: 8,
+  },
+  uploadingText: {
+    color: "white",
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  uploadOptions: {
+    backgroundColor: "white",
+    marginHorizontal: 20,
+    borderRadius: 16,
+    overflow: "hidden",
+  },
+  uploadOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "#f0f0f0",
+  },
+  uploadIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#f0f0f0",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 16,
+  },
+  uploadOptionText: {
+    flex: 1,
+  },
+  uploadOptionTitle: {
+    fontSize: 16,
+    fontWeight: "500",
+    color: "#000",
+    marginBottom: 2,
+  },
+  uploadOptionSubtitle: {
+    fontSize: 13,
+    color: "#666",
+  },
+  headerSpacer: {
+    width: 44,
+  },
+  photoModalContainer: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.9)",
+  },
+  photoModalBackground: {
+    flex: 1,
+  },
+  photoModalHeader: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1,
+    paddingTop: 60,
+    paddingHorizontal: 20,
+  },
+  photoModalCloseButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  photoModalImageContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingTop: 100,
+    paddingBottom: 50,
+    paddingHorizontal: 20,
+  },
+  photoModalImage: {
+    width: "100%",
+    height: "100%",
   },
 });

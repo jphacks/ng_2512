@@ -367,13 +367,14 @@ export default function FriendsScreen() {
       >
         <SafeAreaView style={styles.modalContainer}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>ユーザー検索</Text>
             <TouchableOpacity
               style={styles.closeButton}
               onPress={() => setShowUserSearch(false)}
             >
               <IconSymbol name="xmark" size={16} color="#6A7282" />
             </TouchableOpacity>
+            <Text style={styles.modalTitle}>ユーザー検索</Text>
+            <View style={styles.headerSpacer} />
           </View>
           <View style={styles.searchContainer}>
             <TextInput
@@ -397,13 +398,14 @@ export default function FriendsScreen() {
       >
         <SafeAreaView style={styles.modalContainer}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>フレンド申請</Text>
             <TouchableOpacity
               style={styles.closeButton}
               onPress={() => setShowFriendRequests(false)}
             >
               <IconSymbol name="xmark" size={16} color="#6A7282" />
             </TouchableOpacity>
+            <Text style={styles.modalTitle}>フレンド申請</Text>
+            <View style={styles.headerSpacer} />
           </View>
 
           {/* タブ */}
@@ -472,13 +474,14 @@ export default function FriendsScreen() {
       >
         <SafeAreaView style={styles.modalContainer}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>ブロックユーザー管理</Text>
             <TouchableOpacity
               style={styles.closeButton}
               onPress={() => setShowBlockedUsers(false)}
             >
               <IconSymbol name="xmark" size={16} color="#6A7282" />
             </TouchableOpacity>
+            <Text style={styles.modalTitle}>ブロックユーザー管理</Text>
+            <View style={styles.headerSpacer} />
           </View>
           <View style={styles.emptyState}>
             <Text style={styles.emptyText}>ブロック中のユーザーはいません</Text>
@@ -744,6 +747,11 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "700",
     color: "#1E2939",
+    flex: 1,
+    textAlign: "center",
+  },
+  headerSpacer: {
+    width: 32,
   },
   closeButton: {
     width: 32,

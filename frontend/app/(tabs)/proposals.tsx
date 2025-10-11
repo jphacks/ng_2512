@@ -16,6 +16,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { router } from "expo-router";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import CreateProposalScreen from "../create-proposal";
 
 const { width: screenWidth } = Dimensions.get("window");
 
@@ -197,7 +198,7 @@ export default function ProposalsScreen() {
         {/* Create Button */}
         <TouchableOpacity
           style={styles.createButton}
-          onPress={() => router.push("/create-proposal")}
+          onPress={() => setShowCreateModal(true)}
         >
           <IconSymbol name="plus" size={16} color="#FFFFFF" />
           <Text style={styles.createButtonText}>新しい提案を作成</Text>
@@ -330,118 +331,119 @@ export default function ProposalsScreen() {
       <Modal
         visible={selectedProposal !== null}
         animationType="slide"
-        transparent={true}
+        presentationStyle="pageSheet"
         onRequestClose={() => setSelectedProposal(null)}
       >
-        <View style={styles.modalOverlay}>
-          <View
-            style={[styles.modalContent, { backgroundColor: colors.surface }]}
-          >
-            {selectedProposal && (
-              <>
-                <View
-                  style={[
-                    styles.modalHeader,
-                    { borderBottomColor: colors.border },
-                  ]}
-                >
-                  <Text style={[styles.modalTitle, { color: colors.text }]}>
-                    {selectedProposal.title}
-                  </Text>
+        <SafeAreaView
+          style={[
+            styles.modalContainer,
+            { backgroundColor: colors.background },
+          ]}
+        >
+          {selectedProposal && (
+            <>
+              {/* Modal Header */}
+              <View style={styles.modalHeader}>
+                <View style={styles.modalHeaderContent}>
                   <TouchableOpacity
                     onPress={() => setSelectedProposal(null)}
                     style={styles.closeButton}
                   >
-                    <IconSymbol name="xmark" size={24} color={colors.icon} />
+                    <IconSymbol name="xmark" size={18} color={colors.text} />
                   </TouchableOpacity>
+                  <Text style={[styles.modalTitle, { color: colors.text }]}>
+                    {selectedProposal.title}
+                  </Text>
+                  <View style={styles.headerSpacer} />
+                </View>
+              </View>
+
+              <ScrollView
+                style={styles.modalBody}
+                showsVerticalScrollIndicator={false}
+              >
+                <View
+                  style={[
+                    styles.detailCard,
+                    { backgroundColor: colors.surfaceSecondary },
+                  ]}
+                >
+                  <View style={styles.detailRow}>
+                    <View
+                      style={[
+                        styles.iconContainer,
+                        { backgroundColor: colors.primary + "20" },
+                      ]}
+                    >
+                      <IconSymbol
+                        name="calendar"
+                        size={20}
+                        color={colors.primary}
+                      />
+                    </View>
+                    <Text style={[styles.detailText, { color: colors.text }]}>
+                      {formatDate(selectedProposal.datetime)}
+                    </Text>
+                  </View>
+                  <View style={styles.detailRow}>
+                    <View
+                      style={[
+                        styles.iconContainer,
+                        { backgroundColor: colors.accent + "20" },
+                      ]}
+                    >
+                      <IconSymbol
+                        name="location"
+                        size={20}
+                        color={colors.accent}
+                      />
+                    </View>
+                    <Text style={[styles.detailText, { color: colors.text }]}>
+                      {selectedProposal.location}
+                    </Text>
+                  </View>
+                  <View style={styles.detailRow}>
+                    <View
+                      style={[
+                        styles.iconContainer,
+                        { backgroundColor: colors.secondary + "20" },
+                      ]}
+                    >
+                      <IconSymbol
+                        name="person.2"
+                        size={20}
+                        color={colors.secondary}
+                      />
+                    </View>
+                    <Text style={[styles.detailText, { color: colors.text }]}>
+                      参加者: {selectedProposal.participants.join(", ")}
+                    </Text>
+                  </View>
+                  <View style={styles.detailRow}>
+                    <View
+                      style={[
+                        styles.iconContainer,
+                        { backgroundColor: colors.warning + "20" },
+                      ]}
+                    >
+                      <IconSymbol
+                        name="person"
+                        size={20}
+                        color={colors.warning}
+                      />
+                    </View>
+                    <Text style={[styles.detailText, { color: colors.text }]}>
+                      作成者: {selectedProposal.createdBy}
+                    </Text>
+                  </View>
                 </View>
 
-                <ScrollView
-                  style={styles.modalBody}
-                  showsVerticalScrollIndicator={false}
-                >
-                  <View
-                    style={[
-                      styles.detailCard,
-                      { backgroundColor: colors.surfaceSecondary },
-                    ]}
-                  >
-                    <View style={styles.detailRow}>
-                      <View
-                        style={[
-                          styles.iconContainer,
-                          { backgroundColor: colors.primary + "20" },
-                        ]}
-                      >
-                        <IconSymbol
-                          name="calendar"
-                          size={20}
-                          color={colors.primary}
-                        />
-                      </View>
-                      <Text style={[styles.detailText, { color: colors.text }]}>
-                        {formatDate(selectedProposal.datetime)}
-                      </Text>
-                    </View>
-                    <View style={styles.detailRow}>
-                      <View
-                        style={[
-                          styles.iconContainer,
-                          { backgroundColor: colors.accent + "20" },
-                        ]}
-                      >
-                        <IconSymbol
-                          name="location"
-                          size={20}
-                          color={colors.accent}
-                        />
-                      </View>
-                      <Text style={[styles.detailText, { color: colors.text }]}>
-                        {selectedProposal.location}
-                      </Text>
-                    </View>
-                    <View style={styles.detailRow}>
-                      <View
-                        style={[
-                          styles.iconContainer,
-                          { backgroundColor: colors.secondary + "20" },
-                        ]}
-                      >
-                        <IconSymbol
-                          name="person.2"
-                          size={20}
-                          color={colors.secondary}
-                        />
-                      </View>
-                      <Text style={[styles.detailText, { color: colors.text }]}>
-                        参加者: {selectedProposal.participants.join(", ")}
-                      </Text>
-                    </View>
-                    <View style={styles.detailRow}>
-                      <View
-                        style={[
-                          styles.iconContainer,
-                          { backgroundColor: colors.warning + "20" },
-                        ]}
-                      >
-                        <IconSymbol
-                          name="person"
-                          size={20}
-                          color={colors.warning}
-                        />
-                      </View>
-                      <Text style={[styles.detailText, { color: colors.text }]}>
-                        作成者: {selectedProposal.createdBy}
-                      </Text>
-                    </View>
-                  </View>
-                </ScrollView>
-
+                {/* Action Buttons and Status */}
                 {selectedProposal.createdBy !== "あなた" && (
                   <View style={styles.actionButtons}>
                     <TouchableOpacity
                       style={[
-                        styles.actionButton,
+                        styles.rejectButton,
                         { backgroundColor: colors.error },
                       ]}
                       onPress={() => handleReject(selectedProposal.id)}
@@ -452,7 +454,7 @@ export default function ProposalsScreen() {
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={[
-                        styles.actionButton,
+                        styles.acceptButton,
                         { backgroundColor: colors.success },
                       ]}
                       onPress={() => handleAccept(selectedProposal.id)}
@@ -508,51 +510,81 @@ export default function ProposalsScreen() {
                     </View>
                   </View>
                 )}
-              </>
-            )}
-          </View>
-        </View>
+              </ScrollView>
+            </>
+          )}
+        </SafeAreaView>
       </Modal>
 
-      {/* 作成モーダル（プレースホルダー） */}
-      <Modal
+      {/* Create Proposal Modal */}
+      <CreateProposalScreen
         visible={showCreateModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowCreateModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>提案を作成</Text>
-              <TouchableOpacity onPress={() => setShowCreateModal(false)}>
-                <IconSymbol name="xmark" size={24} color="#666" />
-              </TouchableOpacity>
-            </View>
-            <View style={styles.createOptions}>
-              <TouchableOpacity style={styles.createOption}>
-                <IconSymbol name="wand.and.stars" size={24} color="#007AFF" />
-                <Text style={styles.createOptionText}>AIで自動生成</Text>
-                <Text style={styles.createOptionDesc}>
-                  AIがあなたの好みに合わせて提案を作成します
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.createOption}>
-                <IconSymbol name="pencil" size={24} color="#007AFF" />
-                <Text style={styles.createOptionText}>手動で作成</Text>
-                <Text style={styles.createOptionDesc}>
-                  自分で詳細を入力して提案を作成します
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+        onClose={() => setShowCreateModal(false)}
+      />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  modalContainer: {
+    flex: 1,
+    backgroundColor: "#ffffff",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E9ECEF",
+  },
+  modalHeaderContent: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    width: "100%",
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#1E2939",
+    flex: 1,
+    textAlign: "center",
+  },
+  modalBody: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  closeButton: {
+    width: 32,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 16,
+  },
+  headerSpacer: {
+    width: 32,
+  },
+  rejectButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 8,
+  },
+  acceptButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 8,
+  },
   container: {
     flex: 1,
   },
@@ -764,36 +796,6 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     fontWeight: "400",
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.4)",
-    justifyContent: "flex-end",
-  },
-  modalContent: {
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
-    paddingTop: 24,
-    paddingHorizontal: 24,
-    paddingBottom: 40,
-    maxHeight: "85%",
-  },
-  modalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 28,
-  },
-  modalTitle: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: "#2C3E50",
-    letterSpacing: -0.5,
-  },
-  modalBody: {
-    gap: 20,
-    marginBottom: 28,
-  },
   detailRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -809,15 +811,11 @@ const styles = StyleSheet.create({
   actionButtons: {
     flexDirection: "row",
     gap: 16,
-  },
-  actionButton: {
-    flex: 1,
-    paddingVertical: 16,
-    borderRadius: 16,
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: 8,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 20,
+    borderTopWidth: 1,
+    borderTopColor: "#E9ECEF",
   },
   acceptButtonText: {
     color: "#fff",
@@ -858,10 +856,6 @@ const styles = StyleSheet.create({
     color: "#7F8C8D",
     flex: 2,
     lineHeight: 20,
-  },
-  closeButton: {
-    padding: 8,
-    borderRadius: 20,
   },
   detailCard: {
     borderRadius: 16,

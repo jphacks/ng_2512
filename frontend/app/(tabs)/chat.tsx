@@ -15,6 +15,7 @@ import { router } from "expo-router";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import CreateGroupScreen from "../chat/create-group";
 
 interface ChatRoom {
   id: string;
@@ -111,6 +112,7 @@ export default function ChatScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [refreshing, setRefreshing] = useState(false);
   const [fadeAnim] = useState(new Animated.Value(0));
+  const [showCreateGroup, setShowCreateGroup] = useState(false);
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
 
@@ -308,7 +310,7 @@ export default function ChatScreen() {
                 { backgroundColor: Colors.light.tint, marginRight: 8 },
               ]}
               onPress={() => {
-                router.push("/chat/create-group");
+                setShowCreateGroup(true);
               }}
             >
               <IconSymbol name="plus.circle" size={16} color="#fff" />
@@ -382,6 +384,12 @@ export default function ChatScreen() {
           ItemSeparatorComponent={() => <View style={styles.separator} />}
         />
       </View>
+
+      {/* Modals */}
+      <CreateGroupScreen
+        visible={showCreateGroup}
+        onClose={() => setShowCreateGroup(false)}
+      />
     </SafeAreaView>
   );
 }
