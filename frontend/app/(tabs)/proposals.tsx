@@ -345,15 +345,16 @@ export default function ProposalsScreen() {
               {/* Modal Header */}
               <View style={styles.modalHeader}>
                 <View style={styles.modalHeaderContent}>
-                  <Text style={[styles.modalTitle, { color: colors.text }]}>
-                    {selectedProposal.title}
-                  </Text>
                   <TouchableOpacity
                     onPress={() => setSelectedProposal(null)}
                     style={styles.closeButton}
                   >
                     <IconSymbol name="xmark" size={18} color={colors.text} />
                   </TouchableOpacity>
+                  <Text style={[styles.modalTitle, { color: colors.text }]}>
+                    {selectedProposal.title}
+                  </Text>
+                  <View style={styles.headerSpacer} />
                 </View>
               </View>
 
@@ -562,7 +563,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 16,
-    backgroundColor: "#f5f5f5",
+  },
+  headerSpacer: {
+    width: 32,
   },
   rejectButton: {
     flex: 1,

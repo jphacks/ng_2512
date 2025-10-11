@@ -129,12 +129,13 @@ export default function CreateProposalScreen({
         {/* Modal Header */}
         <View style={styles.modalHeader}>
           <View style={styles.modalHeaderContent}>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>
-              提案を作成
-            </Text>
             <TouchableOpacity style={styles.closeButton} onPress={closeModal}>
               <IconSymbol name="xmark" size={18} color={colors.text} />
             </TouchableOpacity>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>
+              提案を作成
+            </Text>
+            <View style={styles.headerSpacer} />
           </View>
         </View>
 
@@ -407,7 +408,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 16,
-    backgroundColor: "#f5f5f5",
+  },
+  headerSpacer: {
+    width: 32,
   },
   aiGenerateContainer: {
     paddingHorizontal: 16,

@@ -7,12 +7,19 @@ import {
   TouchableOpacity,
   FlatList,
   Alert,
+  Modal,
+  ScrollView,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+
+interface CreateGroupProps {
+  visible: boolean;
+  onClose: () => void;
+}
 
 interface Friend {
   id: string;
@@ -31,7 +38,10 @@ const mockFriends: Friend[] = [
   { id: "6", name: "伊藤さん", username: "@ito_i", isOnline: true },
 ];
 
-export default function CreateGroupScreen() {
+export default function CreateGroupScreen({
+  visible,
+  onClose,
+}: CreateGroupProps) {
   const [groupName, setGroupName] = useState("");
   const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -66,116 +76,59 @@ export default function CreateGroupScreen() {
     Alert.alert("成功", "グループが作成されました！", [
       {
         text: "OK",
-        onPress: () => router.back(),
+        onPress: () => onClose(),
       },
     ]);
   };
 
-  const renderFriend = ({ item }: { item: Friend }) => {
-    const isSelected = selectedFriends.includes(item.id);
-
-    return (
-      <TouchableOpacity
-        style={[
-          styles.friendCard,
-          { backgroundColor: colors.surface },
-          isSelected && {
-            backgroundColor: colors.primary + "10",
-            borderColor: colors.primary,
-            borderWidth: 2,
-          },
-        ]}
-        onPress={() => toggleFriendSelection(item.id)}
-        activeOpacity={0.7}
+  return (
+    <Modal
+      visible={visible}
+      presentationStyle="pageSheet"
+      animationType="slide"
+    >
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: colors.background }]}
       >
-        <View style={styles.friendInfo}>
-          <View
-            style={[styles.avatar, { backgroundColor: colors.primary + "20" }]}
-          >
-            <Text style={[styles.avatarText, { color: colors.primary }]}>
-              {item.name.charAt(0)}
+        {/* Header */}
+        <View style={[styles.header, { backgroundColor: "#FFFFFF" }]}>
+          <View style={styles.headerContent}>
+            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+              <IconSymbol name="xmark" size={18} color={colors.text} />
+            </TouchableOpacity>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>
+              グループ作成
             </Text>
-            <View
+            <View style={styles.headerSpacer} />
+          </View>
+        </View>
+
+        <ScrollView
+          style={styles.content}
+          contentContainerStyle={styles.contentContainer}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Group Name Input */}
+          <View
+            style={[
+              styles.section,
+              styles.formCard,
+              { backgroundColor: colors.surface },
+            ]}
+          >
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              <IconSymbol name="person.3" size={20} color={colors.primary} />{" "}
+              グループ名
+            </Text>
+            <TextInput
               style={[
-                styles.onlineIndicator,
+                styles.textInput,
                 {
-                  backgroundColor: item.isOnline
-                    ? colors.success
-                    : colors.placeholder,
+                  backgroundColor: colors.surfaceSecondary,
+                  borderColor: colors.border,
+                  color: colors.text,
                 },
               ]}
-            />
-          </View>
-          <View style={styles.friendDetails}>
-            <Text style={[styles.friendName, { color: colors.text }]}>
-              {item.name}
-            </Text>
-            <Text
-              style={[styles.friendUsername, { color: colors.placeholder }]}
-            >
-              {item.username}
-            </Text>
-          </View>
-        </View>
-        <View
-          style={[
-            styles.checkbox,
-            { borderColor: colors.placeholder },
-            isSelected && {
-              backgroundColor: colors.primary,
-              borderColor: colors.primary,
-            },
-          ]}
-        >
-          {isSelected && (
-            <IconSymbol name="checkmark" size={16} color="#FFFFFF" />
-          )}
-        </View>
-      </TouchableOpacity>
-    );
-  };
-
-  return (
-    <SafeAreaView style={[styles.container, { backgroundColor: "#F5F5F5" }]}>
-      {/* Header */}
-      <View style={[styles.header, { backgroundColor: "#FFFFFF" }]}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <IconSymbol name="chevron.left" size={20} color="#6A7282" />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: "#1E2939" }]}>
-          グループ作成
-        </Text>
-        <TouchableOpacity
-          style={[
-            styles.createButton,
-            {
-              backgroundColor:
-                groupName.trim() && selectedFriends.length > 0
-                  ? colors.primary
-                  : colors.placeholder,
-            },
-          ]}
-          onPress={createGroup}
-          disabled={!groupName.trim() || selectedFriends.length === 0}
-        >
-          <Text style={styles.createButtonText}>作成</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.content}>
-        {/* Group Name Input */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            グループ名
-          </Text>
-          <View
-            style={[styles.inputContainer, { backgroundColor: colors.surface }]}
-          >
-            <TextInput
-              style={[styles.textInput, { color: colors.text }]}
               value={groupName}
               onChangeText={setGroupName}
               placeholder="グループ名を入力"
@@ -183,177 +136,301 @@ export default function CreateGroupScreen() {
               maxLength={50}
             />
           </View>
-        </View>
 
-        {/* Selected Members Count */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            メンバー選択 ({selectedFriends.length}人選択中)
-          </Text>
-
-          {/* Search */}
+          {/* Member Selection */}
           <View
             style={[
-              styles.searchContainer,
+              styles.section,
+              styles.formCard,
               { backgroundColor: colors.surface },
             ]}
           >
-            <IconSymbol
-              name="magnifyingglass"
-              size={16}
-              color={colors.placeholder}
-            />
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              <IconSymbol name="person.2" size={20} color={colors.accent} />{" "}
+              メンバー選択 ({selectedFriends.length}人選択中)
+            </Text>
+
+            {/* Search */}
             <TextInput
-              style={[styles.searchInput, { color: colors.text }]}
+              style={[
+                styles.textInput,
+                styles.searchInput,
+                {
+                  backgroundColor: colors.surfaceSecondary,
+                  borderColor: colors.border,
+                  color: colors.text,
+                },
+              ]}
               value={searchQuery}
               onChangeText={setSearchQuery}
-              placeholder="フレンドを検索"
+              placeholder="フレンドを検索..."
               placeholderTextColor={colors.placeholder}
             />
-            {searchQuery.length > 0 && (
-              <TouchableOpacity onPress={() => setSearchQuery("")}>
-                <IconSymbol
-                  name="xmark.circle.fill"
-                  size={16}
-                  color={colors.placeholder}
-                />
-              </TouchableOpacity>
-            )}
-          </View>
-        </View>
 
-        {/* Selected Friends Preview */}
-        {selectedFriends.length > 0 && (
-          <View style={styles.selectedSection}>
-            <Text style={[styles.selectedTitle, { color: colors.text }]}>
-              選択中のメンバー
-            </Text>
-            <View style={styles.selectedFriends}>
-              {selectedFriends.map((friendId) => {
-                const friend = mockFriends.find((f) => f.id === friendId);
-                if (!friend) return null;
+            {/* Friend List */}
+            <View style={styles.friendsList}>
+              {filteredFriends.map((friend) => {
+                const isSelected = selectedFriends.includes(friend.id);
                 return (
-                  <View
-                    key={friendId}
+                  <TouchableOpacity
+                    key={friend.id}
                     style={[
-                      styles.selectedChip,
-                      { backgroundColor: colors.primary + "20" },
+                      styles.friendItem,
+                      {
+                        backgroundColor: colors.surfaceSecondary,
+                        borderColor: colors.border,
+                      },
+                      isSelected && {
+                        backgroundColor: colors.primary + "10",
+                        borderColor: colors.primary,
+                      },
                     ]}
+                    onPress={() => toggleFriendSelection(friend.id)}
+                    activeOpacity={0.7}
                   >
-                    <Text
-                      style={[
-                        styles.selectedChipText,
-                        { color: colors.primary },
-                      ]}
-                    >
-                      {friend.name}
-                    </Text>
-                    <TouchableOpacity
-                      onPress={() => toggleFriendSelection(friendId)}
-                    >
-                      <IconSymbol
-                        name="xmark"
-                        size={12}
-                        color={colors.primary}
-                      />
-                    </TouchableOpacity>
-                  </View>
+                    <View style={styles.friendInfo}>
+                      <View
+                        style={[
+                          styles.avatar,
+                          { backgroundColor: colors.primary },
+                        ]}
+                      >
+                        <Text style={styles.avatarText}>
+                          {friend.name.charAt(0)}
+                        </Text>
+                      </View>
+                      <View style={styles.friendDetails}>
+                        <Text
+                          style={[styles.friendName, { color: colors.text }]}
+                        >
+                          {friend.name}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.friendUsername,
+                            { color: colors.placeholder },
+                          ]}
+                        >
+                          {friend.username}
+                        </Text>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
                 );
               })}
             </View>
           </View>
-        )}
 
-        {/* Friends List */}
-        <View style={styles.friendsList}>
-          <FlatList
-            data={filteredFriends}
-            renderItem={renderFriend}
-            keyExtractor={(item) => item.id}
-            showsVerticalScrollIndicator={false}
-            ItemSeparatorComponent={() => <View style={styles.separator} />}
-          />
+          {/* Selected Friends Preview */}
+          {selectedFriends.length > 0 && (
+            <View style={styles.selectedSection}>
+              <Text style={[styles.selectedTitle, { color: colors.text }]}>
+                選択されたメンバー ({selectedFriends.length}人)
+              </Text>
+              <View style={styles.selectedFriends}>
+                {selectedFriends.map((friendId) => {
+                  const friend = mockFriends.find((f) => f.id === friendId);
+                  if (!friend) return null;
+                  return (
+                    <View
+                      key={friendId}
+                      style={[
+                        styles.selectedChip,
+                        { backgroundColor: colors.primary + "20" },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.selectedChipText,
+                          { color: colors.primary },
+                        ]}
+                      >
+                        {friend.name}
+                      </Text>
+                      <TouchableOpacity
+                        onPress={() => toggleFriendSelection(friendId)}
+                      >
+                        <IconSymbol
+                          name="xmark"
+                          size={12}
+                          color={colors.primary}
+                        />
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+        </ScrollView>
+
+        {/* Footer */}
+        <View style={styles.actionButtons}>
+          <TouchableOpacity
+            style={[
+              styles.createButton,
+              {
+                backgroundColor:
+                  groupName.trim() && selectedFriends.length > 0
+                    ? colors.primary
+                    : colors.placeholder,
+              },
+            ]}
+            onPress={createGroup}
+            disabled={!groupName.trim() || selectedFriends.length === 0}
+            activeOpacity={0.8}
+          >
+            <IconSymbol name="plus" size={20} color="#fff" />
+            <Text style={styles.createButtonText}>グループを作成</Text>
+          </TouchableOpacity>
         </View>
-      </View>
-    </SafeAreaView>
+      </SafeAreaView>
+    </Modal>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: "#ffffff",
   },
   header: {
     flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E5E7EB",
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#F3F4F6",
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E9ECEF",
+  },
+  headerContent: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    width: "100%",
   },
   headerTitle: {
-    flex: 1,
     fontSize: 18,
-    fontWeight: "600",
+    fontWeight: "700",
+    color: "#1E2939",
+    flex: 1,
+    textAlign: "center",
   },
-  createButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+  closeButton: {
+    width: 32,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 16,
   },
-  createButtonText: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "600",
+  headerSpacer: {
+    width: 32,
   },
   content: {
     flex: 1,
-    padding: 16,
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+  },
+  contentContainer: {
+    paddingBottom: 20,
   },
   section: {
-    marginBottom: 24,
+    marginTop: 28,
+  },
+  formCard: {
+    borderRadius: 20,
+    padding: 20,
+    marginHorizontal: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: "600",
-    marginBottom: 12,
-  },
-  inputContainer: {
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  textInput: {
-    fontSize: 16,
-  },
-  searchContainer: {
+    marginBottom: 16,
+    letterSpacing: -0.2,
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
     gap: 8,
   },
-  searchInput: {
-    flex: 1,
+  textInput: {
+    borderRadius: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
     fontSize: 16,
+    borderWidth: 1,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  selectedSection: {
+  searchInput: {
     marginBottom: 16,
   },
+  friendsList: {
+    gap: 8,
+  },
+  friendItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#fff",
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#e9ecef",
+  },
+  friendInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#007AFF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  friendDetails: {
+    flex: 1,
+  },
+  friendName: {
+    fontSize: 16,
+    color: "#212529",
+  },
+  friendUsername: {
+    fontSize: 12,
+    opacity: 0.7,
+    marginTop: 2,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: "#ccc",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  selectedSection: {
+    marginTop: 24,
+  },
   selectedTitle: {
-    fontSize: 14,
-    fontWeight: "500",
-    marginBottom: 8,
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#212529",
+    marginBottom: 12,
   },
   selectedFriends: {
     flexDirection: "row",
@@ -363,74 +440,37 @@ const styles = StyleSheet.create({
   selectedChip: {
     flexDirection: "row",
     alignItems: "center",
+    backgroundColor: "#e3f2fd",
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
     gap: 6,
   },
   selectedChipText: {
-    fontSize: 12,
-    fontWeight: "500",
+    fontSize: 14,
+    color: "#1976d2",
   },
-  friendsList: {
+  actionButtons: {
+    flexDirection: "row",
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 20,
+    borderTopWidth: 1,
+    borderTopColor: "#E9ECEF",
+  },
+  createButton: {
     flex: 1,
-  },
-  friendCard: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    padding: 16,
-    borderRadius: 12,
-  },
-  friendInfo: {
-    flexDirection: "row",
-    alignItems: "center",
-    flex: 1,
-  },
-  avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
     justifyContent: "center",
-    alignItems: "center",
-    marginRight: 12,
-    position: "relative",
+    borderRadius: 12,
+    paddingVertical: 12,
+    gap: 8,
   },
-  avatarText: {
-    fontSize: 18,
-    fontWeight: "600",
-  },
-  onlineIndicator: {
-    position: "absolute",
-    bottom: 2,
-    right: 2,
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: "#FFFFFF",
-  },
-  friendDetails: {
-    flex: 1,
-  },
-  friendName: {
+  createButtonText: {
+    color: "#fff",
     fontSize: 16,
-    fontWeight: "500",
-    marginBottom: 2,
-  },
-  friendUsername: {
-    fontSize: 12,
-    opacity: 0.7,
-  },
-  checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  separator: {
-    height: 8,
+    fontWeight: "600",
   },
 });
