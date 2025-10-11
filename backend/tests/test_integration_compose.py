@@ -1,6 +1,10 @@
 import os
 import socket
 
+import pytest
+
+pytestmark = pytest.mark.integration
+
 
 def test_database_url_present():
     assert os.getenv("DATABASE_URL"), "DATABASE_URL must be provided in compose environment"

@@ -154,8 +154,8 @@ digraph DF {
   FL11 [style="filled", fillcolor="#c8e6c9", color="#2e7d32"];
   FL12 [style="filled", fillcolor="#c8e6c9", color="#2e7d32"];
   FL13 [style="filled", fillcolor="#c8e6c9", color="#2e7d32"];
-  FL14 [style="filled,bold", fillcolor="#bbdefb", color="#1565c0"];
-  FL21 [style="filled", fillcolor="#eeeeee", color="#9e9e9e"];
+  FL14 [style="filled", fillcolor="#c8e6c9", color="#2e7d32"];
+  FL21 [style="filled,bold", fillcolor="#bbdefb", color="#1565c0"];
   FL22 [style="filled", fillcolor="#eeeeee", color="#9e9e9e"];
   FL23 [style="filled", fillcolor="#eeeeee", color="#9e9e9e"];
   FL24 [style="filled", fillcolor="#eeeeee", color="#9e9e9e"];
