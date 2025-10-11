@@ -16,89 +16,112 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Colors } from "@/constants/theme";
 
 interface Friend {
-  id: string;
-  name: string;
-  username: string;
-  status: "online" | "offline" | "away";
-  avatar?: string;
+  user_id: number;
+  account_id: string;
+  display_name: string;
+  icon_asset_url: string;
+  updated_at: string;
 }
 
 interface FriendRequest {
-  id: string;
-  name: string;
-  username: string;
-  timestamp: Date;
-  type: "received" | "sent";
-  status: "pending" | "cancelled";
-  avatar?: string;
+  user_id: number;
+  account_id: string;
+  display_name: string;
+  icon_asset_url: string;
+  updated_at: string;
 }
 
-// モックデータ
-const mockFriends: Friend[] = [
-  {
-    id: "1",
-    name: "田中さん",
-    username: "@tanaka123",
-    status: "online",
-  },
-  {
-    id: "2",
-    name: "佐藤さん",
-    username: "@sato_san",
-    status: "offline",
-  },
-  {
-    id: "3",
-    name: "山田さん",
-    username: "@yamada_y",
-    status: "away",
-  },
-  {
-    id: "4",
-    name: "鈴木さん",
-    username: "@suzuki_s",
-    status: "online",
-  },
-  {
-    id: "5",
-    name: "高橋さん",
-    username: "@takahashi_t",
-    status: "offline",
-  },
-  {
-    id: "6",
-    name: "伊藤さん",
-    username: "@ito_i",
-    status: "online",
-  },
-];
+interface FriendData {
+  friend: Friend[];
+  friend_requested: FriendRequest[];
+  friend_recommended: Friend[];
+  friend_requesting: FriendRequest[];
+  friend_blocked: Friend[];
+}
 
-const mockFriendRequests: FriendRequest[] = [
-  {
-    id: "1",
-    name: "斎藤次郎",
-    username: "@saito_jiro",
-    timestamp: new Date("2023-10-11T00:00:00"),
-    type: "sent",
-    status: "pending",
-  },
-  {
-    id: "2",
-    name: "松本太郎",
-    username: "@matsumoto_taro",
-    timestamp: new Date("2023-10-10T00:00:00"),
-    type: "received",
-    status: "pending",
-  },
-  {
-    id: "3",
-    name: "佐々木花子",
-    username: "@sasaki_hanako",
-    timestamp: new Date("2023-10-09T00:00:00"),
-    type: "received",
-    status: "pending",
-  },
-];
+// API仕様に合わせたモックデータ
+const mockFriendData: FriendData = {
+  friend: [
+    {
+      user_id: 1,
+      account_id: "tanaka123",
+      display_name: "田中さん",
+      icon_asset_url: "https://picsum.photos/100/100?random=1",
+      updated_at: "2023-10-11T12:00:00Z",
+    },
+    {
+      user_id: 2,
+      account_id: "sato_san",
+      display_name: "佐藤さん",
+      icon_asset_url: "https://picsum.photos/100/100?random=2",
+      updated_at: "2023-10-11T11:00:00Z",
+    },
+    {
+      user_id: 3,
+      account_id: "yamada_y",
+      display_name: "山田さん",
+      icon_asset_url: "https://picsum.photos/100/100?random=3",
+      updated_at: "2023-10-11T10:00:00Z",
+    },
+    {
+      user_id: 4,
+      account_id: "suzuki_s",
+      display_name: "鈴木さん",
+      icon_asset_url: "https://picsum.photos/100/100?random=4",
+      updated_at: "2023-10-11T09:00:00Z",
+    },
+  ],
+  friend_requested: [
+    {
+      user_id: 5,
+      account_id: "matsumoto_taro",
+      display_name: "松本太郎",
+      icon_asset_url: "https://picsum.photos/100/100?random=5",
+      updated_at: "2023-10-10T15:00:00Z",
+    },
+    {
+      user_id: 6,
+      account_id: "sasaki_hanako",
+      display_name: "佐々木花子",
+      icon_asset_url: "https://picsum.photos/100/100?random=6",
+      updated_at: "2023-10-09T14:00:00Z",
+    },
+  ],
+  friend_recommended: [
+    {
+      user_id: 7,
+      account_id: "watanabe_w",
+      display_name: "渡辺さん",
+      icon_asset_url: "https://picsum.photos/100/100?random=7",
+      updated_at: "2023-10-11T08:00:00Z",
+    },
+    {
+      user_id: 8,
+      account_id: "nakamura_n",
+      display_name: "中村さん",
+      icon_asset_url: "https://picsum.photos/100/100?random=8",
+      updated_at: "2023-10-11T07:00:00Z",
+    },
+  ],
+  friend_requesting: [
+    {
+      user_id: 9,
+      account_id: "saito_jiro",
+      display_name: "斎藤次郎",
+      icon_asset_url: "https://picsum.photos/100/100?random=9",
+      updated_at: "2023-10-11T16:00:00Z",
+    },
+  ],
+  friend_blocked: [
+    {
+      user_id: 10,
+      account_id: "blocked_user",
+      display_name: "ブロック済みユーザー",
+      icon_asset_url: "https://picsum.photos/100/100?random=10",
+      updated_at: "2023-10-08T12:00:00Z",
+    },
+  ],
+};
 
 export default function FriendsScreen() {
   const colorScheme = useColorScheme();
@@ -111,32 +134,6 @@ export default function FriendsScreen() {
   const textColor = Colors[colorScheme ?? "light"].text as string;
   const backgroundColor = Colors[colorScheme ?? "light"].background as string;
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "online":
-        return "#00C950";
-      case "offline":
-        return "#99A1AF";
-      case "away":
-        return "#F0B100";
-      default:
-        return "#99A1AF";
-    }
-  };
-
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case "online":
-        return "オンライン";
-      case "offline":
-        return "オフライン";
-      case "away":
-        return "離席中";
-      default:
-        return "オフライン";
-    }
-  };
-
   const renderFriend = ({ item }: { item: Friend }) => (
     <View style={styles.friendCard}>
       <View style={styles.friendInfo}>
@@ -148,267 +145,193 @@ export default function FriendsScreen() {
             ]}
           >
             <Text style={[styles.avatarText, { color: Colors.light.tint }]}>
-              {item.name.charAt(0)}
+              {item.display_name.charAt(0)}
             </Text>
           </View>
-          <View
-            style={[
-              styles.statusIndicator,
-              { backgroundColor: getStatusColor(item.status) },
-            ]}
-          />
         </View>
         <View style={styles.friendDetails}>
           <Text style={[styles.friendName, { color: textColor }]}>
-            {item.name}
+            {item.display_name}
           </Text>
-          <View style={styles.friendStatus}>
-            <Text style={styles.username}>{item.username}</Text>
-            <Text style={styles.statusDot}>•</Text>
-            <Text style={styles.statusText}>{getStatusText(item.status)}</Text>
-          </View>
+          <Text style={styles.username}>@{item.account_id}</Text>
         </View>
       </View>
-      <View style={styles.friendActions}>
-        <TouchableOpacity style={styles.actionButton}>
-          <IconSymbol name="message" size={16} color="#6A7282" />
+      <TouchableOpacity style={styles.actionButton}>
+        <IconSymbol name="bubble.left" size={16} color={Colors.light.tint} />
+      </TouchableOpacity>
+    </View>
+  );
+
+  const renderFriendRequest = ({ item }: { item: FriendRequest }) => (
+    <View style={styles.requestCard}>
+      <View style={styles.friendInfo}>
+        <View style={styles.avatarContainer}>
+          <View
+            style={[
+              styles.avatar,
+              { backgroundColor: Colors.light.tint + "20" },
+            ]}
+          >
+            <Text style={[styles.avatarText, { color: Colors.light.tint }]}>
+              {item.display_name.charAt(0)}
+            </Text>
+          </View>
+        </View>
+        <View style={styles.friendDetails}>
+          <Text style={[styles.friendName, { color: textColor }]}>
+            {item.display_name}
+          </Text>
+          <Text style={styles.username}>@{item.account_id}</Text>
+        </View>
+      </View>
+      <View style={styles.requestActions}>
+        <TouchableOpacity
+          style={[styles.acceptButton, { backgroundColor: Colors.light.tint }]}
+          onPress={() => handleFriendRequest(item.user_id, "accept")}
+        >
+          <IconSymbol name="checkmark" size={14} color="white" />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.actionButton}>
-          <IconSymbol name="phone" size={16} color="#6A7282" />
+        <TouchableOpacity
+          style={styles.rejectButton}
+          onPress={() => handleFriendRequest(item.user_id, "reject")}
+        >
+          <IconSymbol name="xmark" size={14} color="#FF3B30" />
         </TouchableOpacity>
       </View>
     </View>
   );
 
-  const handleFriendRequest = (
-    requestId: string,
-    action: "accept" | "decline"
-  ) => {
+  const handleFriendRequest = (userId: number, action: "accept" | "reject") => {
+    // API呼び出し処理をここに実装
     Alert.alert(
-      action === "accept" ? "フレンド申請を承認" : "フレンド申請を拒否",
-      action === "accept"
-        ? "この申請を承認しますか？"
-        : "この申請を拒否しますか？",
-      [
-        { text: "キャンセル", style: "cancel" },
-        {
-          text: action === "accept" ? "承認" : "拒否",
-          onPress: () => {
-            Alert.alert(
-              "完了",
-              action === "accept"
-                ? "フレンド申請を承認しました"
-                : "フレンド申請を拒否しました"
-            );
-          },
-        },
-      ]
+      action === "accept" ? "フレンド申請承認" : "フレンド申請拒否",
+      `${action === "accept" ? "承認" : "拒否"}しました`
     );
   };
 
-  const renderFriendRequest = (request: FriendRequest) => (
-    <View key={request.id} style={styles.requestCard}>
-      <View style={styles.requestInfo}>
-        <View
-          style={[styles.avatar, { backgroundColor: Colors.light.tint + "20" }]}
-        >
-          <Text style={[styles.avatarText, { color: Colors.light.tint }]}>
-            {request.name.charAt(0)}
-          </Text>
-        </View>
-        <View style={styles.requestDetails}>
-          <Text style={[styles.requestName, { color: textColor }]}>
-            {request.name}
-          </Text>
-          <Text style={styles.requestUsername}>{request.username}</Text>
-          <Text style={styles.requestTime}>365日前</Text>
-        </View>
-      </View>
-      {request.type === "received" ? (
-        <View style={styles.requestActions}>
-          <TouchableOpacity
-            style={[styles.requestButton, styles.declineButton]}
-            onPress={() => handleFriendRequest(request.id, "decline")}
-          >
-            <IconSymbol name="xmark" size={16} color="#FB2C36" />
-            <Text style={[styles.buttonText, { color: "#FB2C36" }]}>拒否</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.requestButton, styles.acceptButton]}
-            onPress={() => handleFriendRequest(request.id, "accept")}
-          >
-            <IconSymbol name="checkmark" size={16} color="#00C950" />
-            <Text style={[styles.buttonText, { color: "#00C950" }]}>承認</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <View style={styles.sentRequestActions}>
-          <View style={styles.statusBadge}>
-            <Text style={styles.statusBadgeText}>待機中</Text>
-          </View>
-          <TouchableOpacity style={styles.cancelButton}>
-            <Text style={styles.cancelButtonText}>取消</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-    </View>
-  );
-
-  const receivedRequests = mockFriendRequests.filter(
-    (req) => req.type === "received"
-  );
-  const sentRequests = mockFriendRequests.filter((req) => req.type === "sent");
+  const handleSearch = () => {
+    if (searchQuery.trim()) {
+      // API呼び出し処理をここに実装
+      Alert.alert("検索", `"${searchQuery}" で検索しました`);
+    }
+  };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor }]}>
-      {/* ヘッダー */}
-      <View style={[styles.header, { backgroundColor: "#FFFFFF" }]}>
+      {/* Header */}
+      <View style={styles.header}>
         <View style={styles.headerContent}>
-          <View style={styles.headerLeft}>
-            <Text style={[styles.headerTitle, { color: "#1E2939" }]}>
-              フレンド
-            </Text>
-            <Text style={[styles.headerSubtitle, { color: "#6A7282" }]}>
-              フレンドとつながろう
-            </Text>
-          </View>
-          <View style={styles.headerRight}>
-            <TouchableOpacity style={styles.headerIconButton}>
-              <IconSymbol name="magnifyingglass" size={16} color="#6A7282" />
+          <Text style={[styles.title, { color: textColor }]}>フレンド</Text>
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              style={styles.headerButton}
+              onPress={() => setShowUserSearch(true)}
+            >
+              <IconSymbol name="magnifyingglass" size={18} color={textColor} />
             </TouchableOpacity>
             <TouchableOpacity
-              style={styles.headerIconButton}
+              style={[styles.headerButton, styles.requestButton]}
               onPress={() => setShowFriendRequests(true)}
             >
-              <IconSymbol name="bell" size={16} color="#6A7282" />
-              <View style={styles.notificationBadge}>
-                <Text style={styles.badgeText}>3</Text>
-              </View>
+              <IconSymbol name="person.2" size={18} color="white" />
             </TouchableOpacity>
           </View>
         </View>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* 機能ボタン */}
-        <View style={styles.buttonContainer}>
-          <TouchableOpacity
-            style={[styles.featureButton, styles.searchButton]}
-            onPress={() => setShowUserSearch(true)}
-          >
-            <IconSymbol name="magnifyingglass" size={16} color="#fff" />
-            <Text style={styles.buttonLabel}>ユーザー検索</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.featureButton, styles.friendRequestButton]}
-            onPress={() => setShowFriendRequests(true)}
-          >
-            <IconSymbol name="bell" size={16} color="#fff" />
-            <Text style={styles.buttonLabel}>申請管理</Text>
-            <View style={styles.buttonBadge}>
-              <Text style={styles.badgeText}>2</Text>
-            </View>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.featureButton, styles.blockButton]}
-            onPress={() => setShowBlockedUsers(true)}
-          >
-            <IconSymbol name="xmark.circle" size={16} color="#fff" />
-            <Text style={styles.buttonLabel}>ブロック管理</Text>
-          </TouchableOpacity>
-        </View>
+      {/* Friends List */}
+      <FlatList
+        data={mockFriendData.friend}
+        renderItem={renderFriend}
+        keyExtractor={(item) => item.user_id.toString()}
+        style={styles.friendsList}
+        showsVerticalScrollIndicator={false}
+      />
 
-        {/* 統計 */}
-        <View style={styles.statsContainer}>
-          <View style={styles.statCard}>
-            <Text style={[styles.statNumber, { color: Colors.light.tint }]}>
-              10
-            </Text>
-            <Text style={styles.statLabel}>フレンド</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={[styles.statNumber, { color: "#00C950" }]}>4</Text>
-            <Text style={styles.statLabel}>オンライン</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={[styles.statNumber, { color: "#FB2C36" }]}>2</Text>
-            <Text style={styles.statLabel}>申請</Text>
-          </View>
-        </View>
-
-        {/* フレンド一覧 */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: textColor }]}>
-              フレンド一覧
-            </Text>
-            <View style={styles.countBadge}>
-              <Text style={styles.countText}>10人</Text>
-            </View>
-          </View>
-          <FlatList
-            data={mockFriends}
-            renderItem={renderFriend}
-            keyExtractor={(item) => item.id}
-            scrollEnabled={false}
-            ItemSeparatorComponent={() => <View style={styles.separator} />}
-          />
-          <TouchableOpacity style={styles.showMoreButton}>
-            <Text style={styles.showMoreText}>もっと表示 (4人)</Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
-
-      {/* ユーザー検索モーダル */}
+      {/* User Search Modal */}
       <Modal
         visible={showUserSearch}
         animationType="slide"
         presentationStyle="pageSheet"
+        onRequestClose={() => setShowUserSearch(false)}
       >
-        <SafeAreaView style={styles.modalContainer}>
+        <SafeAreaView style={[styles.modalContainer, { backgroundColor }]}>
           <View style={styles.modalHeader}>
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => setShowUserSearch(false)}
-            >
-              <IconSymbol name="xmark" size={16} color="#6A7282" />
-            </TouchableOpacity>
-            <Text style={styles.modalTitle}>ユーザー検索</Text>
-            <View style={styles.headerSpacer} />
+            <View style={styles.modalHeaderContent}>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={() => setShowUserSearch(false)}
+              >
+                <IconSymbol name="xmark" size={18} color={textColor} />
+              </TouchableOpacity>
+              <Text style={[styles.modalTitle, { color: textColor }]}>
+                ユーザー検索
+              </Text>
+              <View style={styles.headerSpacer} />
+            </View>
           </View>
+
           <View style={styles.searchContainer}>
-            <TextInput
-              style={styles.searchInput}
-              placeholder="ユーザー名で検索"
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
+            <View style={styles.searchInput}>
+              <IconSymbol name="magnifyingglass" size={16} color="#666" />
+              <TextInput
+                placeholder="ユーザーIDまたは名前で検索"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                style={styles.searchTextInput}
+                autoFocus
+              />
+            </View>
+            <TouchableOpacity
+              style={[
+                styles.searchButton,
+                { backgroundColor: Colors.light.tint },
+              ]}
+              onPress={handleSearch}
+            >
+              <Text style={styles.searchButtonText}>検索</Text>
+            </TouchableOpacity>
           </View>
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>ユーザーを検索してください</Text>
+
+          {/* Recommended Friends */}
+          <View style={styles.sectionContainer}>
+            <Text style={[styles.sectionTitle, { color: textColor }]}>
+              おすすめのユーザー
+            </Text>
+            <FlatList
+              data={mockFriendData.friend_recommended}
+              renderItem={renderFriend}
+              keyExtractor={(item) => item.user_id.toString()}
+              showsVerticalScrollIndicator={false}
+            />
           </View>
         </SafeAreaView>
       </Modal>
 
-      {/* フレンド申請モーダル */}
+      {/* Friend Requests Modal */}
       <Modal
         visible={showFriendRequests}
         animationType="slide"
         presentationStyle="pageSheet"
+        onRequestClose={() => setShowFriendRequests(false)}
       >
-        <SafeAreaView style={styles.modalContainer}>
+        <SafeAreaView style={[styles.modalContainer, { backgroundColor }]}>
           <View style={styles.modalHeader}>
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => setShowFriendRequests(false)}
-            >
-              <IconSymbol name="xmark" size={16} color="#6A7282" />
-            </TouchableOpacity>
-            <Text style={styles.modalTitle}>フレンド申請</Text>
-            <View style={styles.headerSpacer} />
+            <View style={styles.modalHeaderContent}>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={() => setShowFriendRequests(false)}
+              >
+                <IconSymbol name="xmark" size={18} color={textColor} />
+              </TouchableOpacity>
+              <Text style={[styles.modalTitle, { color: textColor }]}>
+                フレンド申請
+              </Text>
+              <View style={styles.headerSpacer} />
+            </View>
           </View>
 
-          {/* タブ */}
+          {/* Tab Navigation */}
           <View style={styles.tabContainer}>
             <TouchableOpacity
               style={[
@@ -425,13 +348,6 @@ export default function FriendsScreen() {
               >
                 受信済み
               </Text>
-              {receivedRequests.length > 0 && (
-                <View style={styles.tabBadge}>
-                  <Text style={styles.tabBadgeText}>
-                    {receivedRequests.length}
-                  </Text>
-                </View>
-              )}
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.tab, requestTab === "sent" && styles.activeTab]}
@@ -445,47 +361,53 @@ export default function FriendsScreen() {
               >
                 送信済み
               </Text>
-              {sentRequests.length > 0 && (
-                <View
-                  style={[
-                    styles.tabBadge,
-                    { backgroundColor: Colors.light.tint },
-                  ]}
-                >
-                  <Text style={styles.tabBadgeText}>{sentRequests.length}</Text>
-                </View>
-              )}
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.requestList}>
-            {(requestTab === "received" ? receivedRequests : sentRequests).map(
-              renderFriendRequest
-            )}
-          </ScrollView>
+          <FlatList
+            data={
+              requestTab === "received"
+                ? mockFriendData.friend_requested
+                : mockFriendData.friend_requesting
+            }
+            renderItem={renderFriendRequest}
+            keyExtractor={(item) => item.user_id.toString()}
+            style={styles.requestsList}
+            showsVerticalScrollIndicator={false}
+          />
         </SafeAreaView>
       </Modal>
 
-      {/* ブロック管理モーダル */}
+      {/* Blocked Users Modal */}
       <Modal
         visible={showBlockedUsers}
         animationType="slide"
         presentationStyle="pageSheet"
+        onRequestClose={() => setShowBlockedUsers(false)}
       >
-        <SafeAreaView style={styles.modalContainer}>
+        <SafeAreaView style={[styles.modalContainer, { backgroundColor }]}>
           <View style={styles.modalHeader}>
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => setShowBlockedUsers(false)}
-            >
-              <IconSymbol name="xmark" size={16} color="#6A7282" />
-            </TouchableOpacity>
-            <Text style={styles.modalTitle}>ブロックユーザー管理</Text>
-            <View style={styles.headerSpacer} />
+            <View style={styles.modalHeaderContent}>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={() => setShowBlockedUsers(false)}
+              >
+                <IconSymbol name="xmark" size={18} color={textColor} />
+              </TouchableOpacity>
+              <Text style={[styles.modalTitle, { color: textColor }]}>
+                ブロック済みユーザー
+              </Text>
+              <View style={styles.headerSpacer} />
+            </View>
           </View>
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>ブロック中のユーザーはいません</Text>
-          </View>
+
+          <FlatList
+            data={mockFriendData.friend_blocked}
+            renderItem={renderFriend}
+            keyExtractor={(item) => item.user_id.toString()}
+            style={styles.blockedList}
+            showsVerticalScrollIndicator={false}
+          />
         </SafeAreaView>
       </Modal>
     </SafeAreaView>
@@ -500,151 +422,44 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#E9ECEF",
+    borderBottomColor: "#f0f0f0",
   },
   headerContent: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-  headerLeft: {
-    flex: 1,
+  title: {
+    fontSize: 24,
+    fontWeight: "bold",
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    marginBottom: 4,
-  },
-  headerSubtitle: {
-    fontSize: 14,
-  },
-  headerRight: {
+  headerActions: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
   },
-  headerIconButton: {
+  headerButton: {
     width: 36,
-    height: 32,
-    alignItems: "center",
+    height: 36,
+    borderRadius: 18,
     justifyContent: "center",
-    borderRadius: 8,
-  },
-  notificationBadge: {
-    position: "absolute",
-    top: -4,
-    right: -4,
-    backgroundColor: "#FB2C36",
-    borderRadius: 8,
-    width: 16,
-    height: 16,
     alignItems: "center",
-    justifyContent: "center",
+    backgroundColor: "#f0f0f0",
   },
-  badgeText: {
-    color: "#fff",
-    fontSize: 10,
-    fontWeight: "600",
+  requestButton: {
+    backgroundColor: "#ad46ff",
   },
-  content: {
+  friendsList: {
     flex: 1,
     paddingHorizontal: 16,
   },
-  buttonContainer: {
-    flexDirection: "row",
-    gap: 8,
-    marginTop: 24,
-    marginBottom: 24,
-  },
-  featureButton: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    borderRadius: 16,
-    position: "relative",
-  },
-  searchButton: {
-    backgroundColor: Colors.light.tint,
-  },
-  blockButton: {
-    backgroundColor: "#FB2C36",
-  },
-  buttonLabel: {
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: "500",
-    marginLeft: 6,
-  },
-  buttonBadge: {
-    position: "absolute",
-    top: -8,
-    right: -4,
-    backgroundColor: "#FB2C36",
-    borderRadius: 12,
-    width: 24,
-    height: 24,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  statsContainer: {
-    flexDirection: "row",
-    gap: 8,
-    marginBottom: 24,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: "#fff",
-    padding: 16,
-    borderRadius: 16,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#E9ECEF",
-  },
-  statNumber: {
-    fontSize: 24,
-    fontWeight: "700",
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: "#4A5565",
-  },
-  section: {
-    marginBottom: 24,
-  },
-  sectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  countBadge: {
-    backgroundColor: Colors.light.tint + "20",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  countText: {
-    color: Colors.light.tint,
-    fontSize: 12,
-    fontWeight: "500",
-  },
   friendCard: {
-    backgroundColor: "#fff",
-    padding: 16,
-    borderRadius: 16,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    borderWidth: 1,
-    borderColor: "#E9ECEF",
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
   },
   friendInfo: {
     flex: 1,
@@ -659,22 +474,12 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    alignItems: "center",
     justifyContent: "center",
+    alignItems: "center",
   },
   avatarText: {
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  statusIndicator: {
-    position: "absolute",
-    bottom: 2,
-    right: 2,
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: "#fff",
+    fontSize: 18,
+    fontWeight: "bold",
   },
   friendDetails: {
     flex: 1,
@@ -682,237 +487,145 @@ const styles = StyleSheet.create({
   friendName: {
     fontSize: 16,
     fontWeight: "600",
-    marginBottom: 4,
-  },
-  friendStatus: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
+    marginBottom: 2,
   },
   username: {
     fontSize: 14,
-    color: "#6A7282",
-  },
-  statusDot: {
-    fontSize: 14,
-    color: "#6A7282",
-  },
-  statusText: {
-    fontSize: 14,
-    color: "#6A7282",
-  },
-  friendActions: {
-    flexDirection: "row",
-    gap: 8,
+    color: "#666",
   },
   actionButton: {
     width: 36,
-    height: 32,
-    alignItems: "center",
+    height: 36,
+    borderRadius: 18,
     justifyContent: "center",
-    borderRadius: 8,
+    alignItems: "center",
+    backgroundColor: "#f0f0f0",
   },
-  separator: {
-    height: 8,
-  },
-  showMoreButton: {
-    backgroundColor: "#fff",
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
-    borderRadius: 20,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    alignSelf: "center",
-    marginTop: 16,
-  },
-  showMoreText: {
-    color: "#1E2939",
-    fontSize: 14,
-    fontWeight: "500",
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: "#fff",
-  },
-  modalHeader: {
+  requestCard: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    paddingVertical: 12,
     paddingHorizontal: 16,
-    paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#E9ECEF",
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#1E2939",
-    flex: 1,
-    textAlign: "center",
-  },
-  headerSpacer: {
-    width: 32,
-  },
-  closeButton: {
-    width: 32,
-    height: 32,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 8,
-  },
-  searchContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-  },
-  searchInput: {
-    backgroundColor: "#F8F9FA",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: "#E9ECEF",
-  },
-  emptyState: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  emptyText: {
-    fontSize: 16,
-    color: "#6A7282",
-  },
-  tabContainer: {
-    flexDirection: "row",
-    backgroundColor: "#F8F9FA",
-    margin: 16,
-    borderRadius: 12,
-    padding: 4,
-  },
-  tab: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    gap: 8,
-  },
-  activeTab: {
-    backgroundColor: "#fff",
-  },
-  tabText: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: "#6A7282",
-  },
-  activeTabText: {
-    color: "#1E2939",
-  },
-  tabBadge: {
-    backgroundColor: "#FB2C36",
-    borderRadius: 10,
-    width: 20,
-    height: 20,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  tabBadgeText: {
-    color: "#fff",
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  requestList: {
-    flex: 1,
-    paddingHorizontal: 16,
-  },
-  requestCard: {
-    backgroundColor: "#fff",
-    padding: 16,
-    borderRadius: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: "#E9ECEF",
-  },
-  requestInfo: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  requestDetails: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  requestName: {
-    fontSize: 16,
-    fontWeight: "600",
-    marginBottom: 4,
-  },
-  requestUsername: {
-    fontSize: 14,
-    color: "#6A7282",
-    marginBottom: 4,
-  },
-  requestTime: {
-    fontSize: 12,
-    color: "#99A1AF",
+    borderBottomColor: "#f0f0f0",
   },
   requestActions: {
     flexDirection: "row",
     gap: 8,
   },
-  requestButton: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 10,
-    borderRadius: 8,
-    gap: 4,
-  },
-  friendRequestButton: {
-    backgroundColor: "#00C950",
-  },
-  declineButton: {
-    backgroundColor: "#FFE6E6",
-  },
   acceptButton: {
-    backgroundColor: "#E6F9E6",
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: "center",
+    alignItems: "center",
   },
-  buttonText: {
-    fontSize: 14,
-    fontWeight: "500",
+  rejectButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#f0f0f0",
   },
-  sentRequestActions: {
+  modalContainer: {
+    flex: 1,
+  },
+  modalHeader: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
+  },
+  modalHeaderContent: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-  statusBadge: {
-    backgroundColor: "#FFF8E1",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+  closeButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+  },
+  headerSpacer: {
+    width: 36,
+  },
+  searchContainer: {
+    padding: 16,
+    flexDirection: "row",
+    gap: 12,
+  },
+  searchInput: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f0f0f0",
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#FFE082",
+    paddingHorizontal: 12,
+    gap: 8,
   },
-  statusBadgeText: {
-    color: "#A65F00",
-    fontSize: 12,
-    fontWeight: "500",
+  searchTextInput: {
+    flex: 1,
+    paddingVertical: 12,
+    fontSize: 16,
   },
-  cancelButton: {
-    backgroundColor: "#fff",
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
+  searchButton: {
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
+    paddingVertical: 12,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
   },
-  cancelButtonText: {
-    color: "#4A5565",
+  searchButtonText: {
+    color: "white",
     fontSize: 14,
-    fontWeight: "500",
+    fontWeight: "600",
+  },
+  sectionContainer: {
+    flex: 1,
+    paddingHorizontal: 16,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    marginBottom: 12,
+  },
+  tabContainer: {
+    flexDirection: "row",
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: "center",
+    borderBottomWidth: 2,
+    borderBottomColor: "transparent",
+  },
+  activeTab: {
+    borderBottomColor: "#ad46ff",
+  },
+  tabText: {
+    fontSize: 16,
+    color: "#666",
+  },
+  activeTabText: {
+    color: "#ad46ff",
+    fontWeight: "600",
+  },
+  requestsList: {
+    flex: 1,
+  },
+  blockedList: {
+    flex: 1,
+    paddingHorizontal: 16,
   },
 });

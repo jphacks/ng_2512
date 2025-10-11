@@ -17,11 +17,11 @@ import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 
 interface Album {
-  id: string;
+  albam_id: number;
   title: string;
-  photoCount: number;
-  sharedWithCount: number;
-  coverImage: string;
+  last_uploaded_image_url: string;
+  image_num: number;
+  shared_user_num: number;
 }
 
 interface User {
@@ -49,27 +49,28 @@ export default function AlbumScreen() {
     { id: "10", name: "加藤さん", username: "@kato_k", selected: false },
   ]);
 
+  // API仕様に合わせたモックデータ
   const albums: Album[] = [
     {
-      id: "1",
+      albam_id: 1,
       title: "夏の思い出",
-      photoCount: 12,
-      sharedWithCount: 3,
-      coverImage: "https://picsum.photos/200/200?random=1",
+      last_uploaded_image_url: "https://picsum.photos/200/200?random=1",
+      image_num: 12,
+      shared_user_num: 3,
     },
     {
-      id: "2",
+      albam_id: 2,
       title: "カフェ巡り",
-      photoCount: 8,
-      sharedWithCount: 2,
-      coverImage: "https://picsum.photos/200/200?random=2",
+      last_uploaded_image_url: "https://picsum.photos/200/200?random=2",
+      image_num: 8,
+      shared_user_num: 2,
     },
     {
-      id: "3",
+      albam_id: 3,
       title: "美術館巡り",
-      photoCount: 5,
-      sharedWithCount: 3,
-      coverImage: "https://picsum.photos/200/200?random=3",
+      last_uploaded_image_url: "https://picsum.photos/200/200?random=3",
+      image_num: 5,
+      shared_user_num: 3,
     },
   ];
 
@@ -101,7 +102,7 @@ export default function AlbumScreen() {
     // アルバム詳細画面への遷移
     router.push({
       pathname: "/album/[id]",
-      params: { id: album.id },
+      params: { id: album.albam_id.toString() },
     });
   };
 
@@ -111,17 +112,20 @@ export default function AlbumScreen() {
       onPress={() => handleAlbumPress(item)}
     >
       <View style={styles.albumImageContainer}>
-        <Image source={{ uri: item.coverImage }} style={styles.albumImage} />
+        <Image
+          source={{ uri: item.last_uploaded_image_url }}
+          style={styles.albumImage}
+        />
         <View style={styles.photoCountBadge}>
           <IconSymbol name="photo" size={12} color="white" />
-          <Text style={styles.photoCountText}>{item.photoCount}</Text>
+          <Text style={styles.photoCountText}>{item.image_num}</Text>
         </View>
       </View>
       <View style={styles.albumInfo}>
         <Text style={styles.albumTitle}>{item.title}</Text>
         <View style={styles.sharedInfo}>
           <IconSymbol name="person.2" size={16} color={colors.textSecondary} />
-          <Text style={styles.sharedText}>{item.sharedWithCount}人で共有</Text>
+          <Text style={styles.sharedText}>{item.shared_user_num}人で共有</Text>
         </View>
       </View>
     </TouchableOpacity>
@@ -167,7 +171,7 @@ export default function AlbumScreen() {
         showsVerticalScrollIndicator={false}
         data={albums}
         renderItem={renderAlbumCard}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item.albam_id.toString()}
         numColumns={2}
         columnWrapperStyle={styles.albumRow}
         ListHeaderComponent={

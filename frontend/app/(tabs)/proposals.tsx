@@ -20,56 +20,108 @@ import CreateProposalScreen from "../create-proposal";
 
 const { width: screenWidth } = Dimensions.get("window");
 
-interface Proposal {
-  id: string;
-  title: string;
-  datetime: Date;
-  participants: string[];
-  location: string;
-  createdBy: string;
-  acceptedCount: number;
-  rejectedCount: number;
-  status: "pending" | "accepted" | "rejected" | "expired";
-  createdAt: Date;
+interface Participant {
+  user_id: number;
+  account_id: string;
+  status: "pending" | "accepted" | "rejected";
+  display_name: string;
+  icon_asset_url: string;
 }
 
-// モックデータ
+interface Proposal {
+  id: number;
+  title: string;
+  event_date: string;
+  location: string;
+  creator_id: number;
+  created_at: string;
+  deadline_at: string;
+  participants: Participant[];
+}
+
+// API仕様に合わせたモックデータ
 const mockProposals: Proposal[] = [
   {
-    id: "1",
+    id: 1,
     title: "週末の映画鑑賞",
-    datetime: new Date("2025-10-12T14:00:00"),
-    participants: ["田中", "佐藤", "鈴木"],
+    event_date: "2025-10-12T14:00:00Z",
     location: "新宿の映画館",
-    createdBy: "友達",
-    acceptedCount: 0,
-    rejectedCount: 0,
-    status: "pending",
-    createdAt: new Date("2025-10-07T10:00:00"),
+    creator_id: 2,
+    created_at: "2025-10-07T10:00:00Z",
+    deadline_at: "2025-10-11T23:59:59Z",
+    participants: [
+      {
+        user_id: 1,
+        account_id: "tanaka123",
+        status: "pending",
+        display_name: "田中さん",
+        icon_asset_url: "https://picsum.photos/100/100?random=1",
+      },
+      {
+        user_id: 3,
+        account_id: "sato_san",
+        status: "accepted",
+        display_name: "佐藤さん",
+        icon_asset_url: "https://picsum.photos/100/100?random=2",
+      },
+      {
+        user_id: 4,
+        account_id: "suzuki_s",
+        status: "pending",
+        display_name: "鈴木さん",
+        icon_asset_url: "https://picsum.photos/100/100?random=3",
+      },
+    ],
   },
   {
-    id: "2",
-    title: "カフェでまったり読書会",
-    datetime: new Date("2025-10-15T10:00:00"),
-    participants: ["山田", "高橋"],
-    location: "表参道のブックカフェ",
-    createdBy: "あなた",
-    acceptedCount: 1,
-    rejectedCount: 0,
-    status: "pending",
-    createdAt: new Date("2025-10-12T15:30:00"),
+    id: 2,
+    title: "カフェ巡り",
+    event_date: "2025-10-13T15:30:00Z",
+    location: "渋谷エリア",
+    creator_id: 1,
+    created_at: "2025-10-08T09:30:00Z",
+    deadline_at: "2025-10-12T18:00:00Z",
+    participants: [
+      {
+        user_id: 2,
+        account_id: "yamada_y",
+        status: "accepted",
+        display_name: "山田さん",
+        icon_asset_url: "https://picsum.photos/100/100?random=4",
+      },
+      {
+        user_id: 5,
+        account_id: "takahashi_t",
+        status: "pending",
+        display_name: "高橋さん",
+        icon_asset_url: "https://picsum.photos/100/100?random=5",
+      },
+    ],
   },
   {
-    id: "3",
-    title: "美術館でアート鑑賞",
-    datetime: new Date("2025-10-20T13:00:00"),
-    participants: ["伊藤", "松本", "清水", "井上"],
-    location: "上野の国立美術館",
-    createdBy: "友達",
-    acceptedCount: 0,
-    rejectedCount: 0,
-    status: "pending",
-    createdAt: new Date("2025-10-09T12:00:00"),
+    id: 3,
+    title: "美術館見学",
+    event_date: "2025-10-14T11:00:00Z",
+    location: "上野美術館",
+    creator_id: 3,
+    created_at: "2025-10-09T14:20:00Z",
+    deadline_at: "2025-10-13T20:00:00Z",
+    participants: [
+      {
+        user_id: 1,
+        account_id: "tanaka123",
+        status: "rejected",
+        display_name: "田中さん",
+        icon_asset_url: "https://picsum.photos/100/100?random=1",
+      },
+      {
+        user_id: 6,
+        account_id: "ito_i",
+        status: "accepted",
+        display_name: "伊藤さん",
+        icon_asset_url: "https://picsum.photos/100/100?random=6",
+      },
+    ],
   },
 ];
 
@@ -109,7 +161,8 @@ export default function ProposalsScreen() {
     }, 1000);
   }, []);
 
-  const formatDate = (date: Date) => {
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
     const month = date.getMonth() + 1;
     const day = date.getDate();
     const weekday = ["日", "月", "火", "水", "木", "金", "土"][date.getDay()];
@@ -120,19 +173,22 @@ export default function ProposalsScreen() {
   };
 
   const isExpired = (proposal: Proposal) => {
-    const expiryDate = new Date(proposal.createdAt);
+    const expiryDate = new Date(proposal.created_at);
     expiryDate.setDate(expiryDate.getDate() + 7);
     return new Date() > expiryDate;
   };
 
-  const handleAccept = (proposalId: string) => {
+  const handleAccept = (proposalId: number) => {
     setProposals((prev) =>
       prev.map((p) =>
         p.id === proposalId
           ? {
               ...p,
-              acceptedCount: p.acceptedCount + 1,
-              status: "accepted" as const,
+              participants: p.participants.map((participant) =>
+                participant.user_id === 1 // 仮に現在のユーザーのIDを1とする
+                  ? { ...participant, status: "accepted" as const }
+                  : participant
+              ),
             }
           : p
       )
@@ -140,9 +196,24 @@ export default function ProposalsScreen() {
     setSelectedProposal(null);
   };
 
-  const handleReject = (proposalId: string) => {
+  const handleReject = (proposalId: number) => {
     setProposals((prev) => prev.filter((p) => p.id !== proposalId));
     setSelectedProposal(null);
+  };
+
+  // ヘルパー関数: 承諾数を計算
+  const getAcceptedCount = (participants: Participant[]) => {
+    return participants.filter((p) => p.status === "accepted").length;
+  };
+
+  // ヘルパー関数: 拒否数を計算
+  const getRejectedCount = (participants: Participant[]) => {
+    return participants.filter((p) => p.status === "rejected").length;
+  };
+
+  // ヘルパー関数: 現在のユーザーが作成者かどうか
+  const isCurrentUserCreator = (creatorId: number) => {
+    return creatorId === 1; // 仮に現在のユーザーのIDを1とする
   };
 
   const renderProposalCard = ({
@@ -283,7 +354,7 @@ export default function ProposalsScreen() {
                     <View style={styles.infoRow}>
                       <IconSymbol name="calendar" size={16} color="#4A5565" />
                       <Text style={[styles.infoText, { color: "#4A5565" }]}>
-                        {formatDate(item.datetime)}
+                        {formatDate(item.event_date)}
                       </Text>
                       {item.participants.length > 1 && (
                         <Text style={[styles.moreText, { color: "#99A1AF" }]}>
@@ -296,11 +367,12 @@ export default function ProposalsScreen() {
                       <Text style={[styles.infoText, { color: "#4A5565" }]}>
                         {item.participants.length}人
                       </Text>
-                      {item.acceptedCount > 0 && (
+                      {getAcceptedCount(item.participants) > 0 && (
                         <Text
                           style={[styles.acceptedInfo, { color: "#155DFC" }]}
                         >
-                          {item.acceptedCount}/{item.participants.length}
+                          {getAcceptedCount(item.participants)}/
+                          {item.participants.length}
                           人が承認
                         </Text>
                       )}
@@ -315,7 +387,7 @@ export default function ProposalsScreen() {
                         あと5日
                       </Text>
                     </View>
-                    {item.createdBy === "あなた" && (
+                    {isCurrentUserCreator(item.creator_id) && (
                       <Text style={[styles.ownProposal, { color: "#155DFC" }]}>
                         自分の提案
                       </Text>
@@ -382,7 +454,7 @@ export default function ProposalsScreen() {
                       />
                     </View>
                     <Text style={[styles.detailText, { color: colors.text }]}>
-                      {formatDate(selectedProposal.datetime)}
+                      {formatDate(selectedProposal.event_date)}
                     </Text>
                   </View>
                   <View style={styles.detailRow}>
@@ -416,7 +488,10 @@ export default function ProposalsScreen() {
                       />
                     </View>
                     <Text style={[styles.detailText, { color: colors.text }]}>
-                      参加者: {selectedProposal.participants.join(", ")}
+                      参加者:{" "}
+                      {selectedProposal.participants
+                        .map((p) => p.display_name)
+                        .join(", ")}
                     </Text>
                   </View>
                   <View style={styles.detailRow}>
@@ -433,13 +508,16 @@ export default function ProposalsScreen() {
                       />
                     </View>
                     <Text style={[styles.detailText, { color: colors.text }]}>
-                      作成者: {selectedProposal.createdBy}
+                      作成者:{" "}
+                      {isCurrentUserCreator(selectedProposal.creator_id)
+                        ? "あなた"
+                        : "友達"}
                     </Text>
                   </View>
                 </View>
 
                 {/* Action Buttons and Status */}
-                {selectedProposal.createdBy !== "あなた" && (
+                {!isCurrentUserCreator(selectedProposal.creator_id) && (
                   <View style={styles.actionButtons}>
                     <TouchableOpacity
                       style={[
@@ -466,7 +544,7 @@ export default function ProposalsScreen() {
                   </View>
                 )}
 
-                {selectedProposal.createdBy === "あなた" && (
+                {isCurrentUserCreator(selectedProposal.creator_id) && (
                   <View
                     style={[
                       styles.statusInfo,
@@ -481,7 +559,7 @@ export default function ProposalsScreen() {
                             { color: colors.success },
                           ]}
                         >
-                          {selectedProposal.acceptedCount}
+                          {getAcceptedCount(selectedProposal.participants)}
                         </Text>
                         <Text
                           style={[styles.statusLabel, { color: colors.text }]}
@@ -499,7 +577,7 @@ export default function ProposalsScreen() {
                         <Text
                           style={[styles.statusNumber, { color: colors.error }]}
                         >
-                          {selectedProposal.rejectedCount}
+                          {getRejectedCount(selectedProposal.participants)}
                         </Text>
                         <Text
                           style={[styles.statusLabel, { color: colors.text }]}

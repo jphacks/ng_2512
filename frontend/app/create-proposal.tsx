@@ -16,23 +16,25 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { router } from "expo-router";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useUserId } from "@/hooks/use-user-id";
 
 const { width: screenWidth } = Dimensions.get("window");
 
 interface Friend {
-  id: string;
-  name: string;
-  avatar?: string;
+  user_id: number;
+  account_id: string;
+  display_name: string;
+  icon_asset_url?: string;
 }
 
 // モックフレンドデータ
 const mockFriends: Friend[] = [
-  { id: "1", name: "田中太郎" },
-  { id: "2", name: "佐藤花子" },
-  { id: "3", name: "鈴木一郎" },
-  { id: "4", name: "山田美香" },
-  { id: "5", name: "高橋健太" },
-  { id: "6", name: "渡辺さくら" },
+  { user_id: 1, account_id: "tanaka_taro", display_name: "田中太郎" },
+  { user_id: 2, account_id: "sato_hanako", display_name: "佐藤花子" },
+  { user_id: 3, account_id: "suzuki_ichiro", display_name: "鈴木一郎" },
+  { user_id: 4, account_id: "yamada_mika", display_name: "山田美香" },
+  { user_id: 5, account_id: "takahashi_kenta", display_name: "高橋健太" },
+  { user_id: 6, account_id: "watanabe_sakura", display_name: "渡辺さくら" },
 ];
 
 interface CreateProposalProps {
@@ -44,10 +46,11 @@ export default function CreateProposalScreen({
   visible,
   onClose,
 }: CreateProposalProps) {
+  const { userId } = useUserId();
   const [title, setTitle] = useState("");
   const [datetime, setDatetime] = useState("");
   const [location, setLocation] = useState("");
-  const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
+  const [participant_ids, setParticipantIds] = useState<number[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [fadeAnim] = useState(new Animated.Value(0));
   const [slideAnim] = useState(new Animated.Value(50));
@@ -70,14 +73,14 @@ export default function CreateProposalScreen({
   }, []);
 
   const filteredFriends = mockFriends.filter((friend) =>
-    friend.name.toLowerCase().includes(searchQuery.toLowerCase())
+    friend.display_name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const toggleFriendSelection = (friendId: string) => {
-    setSelectedFriends((prev) =>
-      prev.includes(friendId)
-        ? prev.filter((id) => id !== friendId)
-        : [...prev, friendId]
+  const toggleFriendSelection = (friendUserId: number) => {
+    setParticipantIds((prev) =>
+      prev.includes(friendUserId)
+        ? prev.filter((id) => id !== friendUserId)
+        : [...prev, friendUserId]
     );
   };
 
@@ -86,9 +89,14 @@ export default function CreateProposalScreen({
       !title.trim() ||
       !datetime.trim() ||
       !location.trim() ||
-      selectedFriends.length === 0
+      participant_ids.length === 0
     ) {
       Alert.alert("エラー", "すべての項目を入力してください。");
+      return;
+    }
+
+    if (!userId) {
+      Alert.alert("エラー", "ユーザーIDが取得できません。");
       return;
     }
 
@@ -97,6 +105,14 @@ export default function CreateProposalScreen({
         text: "OK",
         onPress: () => {
           // ここで実際の作成処理を行う
+          // POST /api/proposal with: user_id, title, event_date, location, participant_ids
+          console.log("提案データ:", {
+            user_id: userId,
+            title,
+            event_date: datetime,
+            location,
+            participant_ids,
+          });
           onClose();
         },
       },
@@ -108,11 +124,19 @@ export default function CreateProposalScreen({
   };
 
   const handleAIGenerate = () => {
+    if (!userId) {
+      Alert.alert("エラー", "ユーザーIDが取得できません。");
+      return;
+    }
+
     // AI生成のモック実装
+    // GET /api/proposal/ai with user_id
+    console.log("AI生成リクエスト:", { user_id: userId });
+
     setTitle("おしゃれなカフェでまったり時間");
     setDatetime("2025年10月20日 14:00");
     setLocation("表参道カフェ街");
-    setSelectedFriends(["1", "2"]); // 最初の2人を自動選択
+    setParticipantIds([1, 2]); // 最初の2人を自動選択
     Alert.alert("AI生成完了", "AIがあなたの好みに合わせて提案を生成しました！");
   };
 
@@ -284,7 +308,7 @@ export default function CreateProposalScreen({
               <View style={styles.friendsList}>
                 {filteredFriends.map((friend) => (
                   <TouchableOpacity
-                    key={friend.id}
+                    key={friend.user_id}
                     style={[
                       styles.friendItem,
                       {
@@ -292,7 +316,7 @@ export default function CreateProposalScreen({
                         borderColor: colors.border,
                       },
                     ]}
-                    onPress={() => toggleFriendSelection(friend.id)}
+                    onPress={() => toggleFriendSelection(friend.user_id)}
                     activeOpacity={0.7}
                   >
                     <View style={styles.friendInfo}>
@@ -303,27 +327,27 @@ export default function CreateProposalScreen({
                         ]}
                       >
                         <Text style={styles.avatarText}>
-                          {friend.name.charAt(0)}
+                          {friend.display_name.charAt(0)}
                         </Text>
                       </View>
                       <Text style={[styles.friendName, { color: colors.text }]}>
-                        {friend.name}
+                        {friend.display_name}
                       </Text>
                     </View>
                     <View
                       style={[
                         styles.checkbox,
                         {
-                          borderColor: selectedFriends.includes(friend.id)
+                          borderColor: participant_ids.includes(friend.user_id)
                             ? colors.primary
                             : colors.border,
                         },
-                        selectedFriends.includes(friend.id) && {
+                        participant_ids.includes(friend.user_id) && {
                           backgroundColor: colors.primary,
                         },
                       ]}
                     >
-                      {selectedFriends.includes(friend.id) && (
+                      {participant_ids.includes(friend.user_id) && (
                         <IconSymbol name="checkmark" size={16} color="#fff" />
                       )}
                     </View>
@@ -333,21 +357,23 @@ export default function CreateProposalScreen({
             </View>
           </Animated.View>
 
-          {selectedFriends.length > 0 && (
+          {participant_ids.length > 0 && (
             <View style={styles.selectedSection}>
               <Text style={styles.selectedTitle}>
-                選択された参加者 ({selectedFriends.length}人)
+                選択された参加者 ({participant_ids.length}人)
               </Text>
               <View style={styles.selectedFriends}>
-                {selectedFriends.map((friendId) => {
-                  const friend = mockFriends.find((f) => f.id === friendId);
+                {participant_ids.map((friendUserId) => {
+                  const friend = mockFriends.find(
+                    (f) => f.user_id === friendUserId
+                  );
                   return (
-                    <View key={friendId} style={styles.selectedFriend}>
+                    <View key={friendUserId} style={styles.selectedFriend}>
                       <Text style={styles.selectedFriendName}>
-                        {friend?.name}
+                        {friend?.display_name}
                       </Text>
                       <TouchableOpacity
-                        onPress={() => toggleFriendSelection(friendId)}
+                        onPress={() => toggleFriendSelection(friendUserId)}
                       >
                         <IconSymbol name="xmark" size={16} color="#666" />
                       </TouchableOpacity>

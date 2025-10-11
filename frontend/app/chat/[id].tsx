@@ -17,51 +17,69 @@ import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 
 interface Message {
-  id: string;
-  text: string;
-  sender: string;
-  timestamp: Date;
-  isOwn: boolean;
+  chat_id: number;
+  sender_id: number;
+  sender_name: string;
+  sender_icon_url: string;
+  body: string;
+  image_url: string;
+  posted_at: string;
+  isOwn: boolean; // フロントエンド用の追加プロパティ
 }
 
 // モックメッセージデータ
 const mockMessages: { [key: string]: Message[] } = {
   "1": [
     {
-      id: "1",
-      text: "こんにちは！映画の件、どうでしたか？",
-      sender: "田中さん",
-      timestamp: new Date("2025-10-11T14:30:00"),
+      chat_id: 1,
+      sender_id: 2,
+      sender_name: "田中太郎",
+      sender_icon_url: "",
+      body: "こんにちは！映画の件、どうでしたか？",
+      image_url: "",
+      posted_at: "2025-10-11T14:30:00",
       isOwn: false,
     },
     {
-      id: "2",
-      text: "新宿の映画館で14時からはどうですか？",
-      sender: "田中さん",
-      timestamp: new Date("2025-10-11T14:31:00"),
+      chat_id: 2,
+      sender_id: 2,
+      sender_name: "田中太郎",
+      sender_icon_url: "",
+      body: "新宿の映画館で14時からはどうですか？",
+      image_url: "",
+      posted_at: "2025-10-11T14:31:00",
       isOwn: false,
     },
     {
-      id: "3",
-      text: "いいですね！参加します😊",
-      sender: "あなた",
-      timestamp: new Date("2025-10-11T14:32:00"),
+      chat_id: 3,
+      sender_id: 1,
+      sender_name: "あなた",
+      sender_icon_url: "",
+      body: "いいですね！参加します😊",
+      image_url: "",
+      posted_at: "2025-10-11T14:32:00",
       isOwn: true,
     },
   ],
   "2": [
     {
-      id: "4",
-      text: "みんな明日の14時で大丈夫？",
-      sender: "佐藤さん",
-      timestamp: new Date("2025-10-11T12:15:00"),
+      chat_id: 4,
+      sender_id: 3,
+      sender_name: "佐藤花子",
+      sender_icon_url: "",
+      body: "みんな明日の14時で大丈夫？",
+      image_url: "",
+      posted_at: "2025-10-11T12:15:00",
       isOwn: false,
     },
     {
-      id: "5",
-      text: "はい、大丈夫です！",
-      sender: "あなた",
-      timestamp: new Date("2025-10-11T12:16:00"),
+      chat_id: 5,
+      sender_id: 1,
+      sender_name: "あなた",
+      sender_icon_url: "",
+      body: "はい、大丈夫です！",
+      image_url: "",
+      posted_at: "2025-10-11T12:16:00",
       isOwn: true,
     },
   ],
@@ -114,10 +132,13 @@ export default function ChatDetailScreen() {
   const sendMessage = () => {
     if (inputText.trim()) {
       const newMessage: Message = {
-        id: Date.now().toString(),
-        text: inputText.trim(),
-        sender: "あなた",
-        timestamp: new Date(),
+        chat_id: Date.now(),
+        sender_id: 1, // 現在のユーザーID
+        sender_name: "あなた",
+        sender_icon_url: "",
+        body: inputText.trim(),
+        image_url: "",
+        posted_at: new Date().toISOString(),
         isOwn: true,
       };
       setMessages([...messages, newMessage]);
@@ -130,7 +151,8 @@ export default function ChatDetailScreen() {
     }
   };
 
-  const formatTime = (date: Date) => {
+  const formatTime = (dateString: string) => {
+    const date = new Date(dateString);
     return `${date.getHours()}:${date
       .getMinutes()
       .toString()
@@ -139,7 +161,7 @@ export default function ChatDetailScreen() {
 
   const renderMessage = ({ item, index }: { item: Message; index: number }) => {
     const showSender =
-      index === 0 || messages[index - 1].sender !== item.sender;
+      index === 0 || messages[index - 1].sender_name !== item.sender_name;
 
     return (
       <View
@@ -150,7 +172,7 @@ export default function ChatDetailScreen() {
       >
         {!item.isOwn && showSender && (
           <Text style={[styles.senderName, { color: colors.text }]}>
-            {item.sender}
+            {item.sender_name}
           </Text>
         )}
         <View
@@ -167,11 +189,11 @@ export default function ChatDetailScreen() {
               { color: item.isOwn ? "#FFFFFF" : colors.text },
             ]}
           >
-            {item.text}
+            {item.body}
           </Text>
         </View>
         <Text style={[styles.messageTime, { color: colors.placeholder }]}>
-          {formatTime(item.timestamp)}
+          {formatTime(item.posted_at)}
         </Text>
       </View>
     );
@@ -244,7 +266,7 @@ export default function ChatDetailScreen() {
           ref={flatListRef}
           data={messages}
           renderItem={renderMessage}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item) => item.chat_id.toString()}
           style={styles.messagesList}
           contentContainerStyle={styles.messagesContent}
           showsVerticalScrollIndicator={false}

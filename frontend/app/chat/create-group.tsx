@@ -22,20 +22,51 @@ interface CreateGroupProps {
 }
 
 interface Friend {
-  id: string;
-  name: string;
-  username: string;
+  user_id: number;
+  account_id: string;
+  display_name: string;
+  icon_asset_url?: string;
   isOnline: boolean;
 }
 
 // モックフレンドデータ
 const mockFriends: Friend[] = [
-  { id: "1", name: "田中さん", username: "@tanaka123", isOnline: true },
-  { id: "2", name: "佐藤さん", username: "@sato_san", isOnline: false },
-  { id: "3", name: "山田さん", username: "@yamada_y", isOnline: false },
-  { id: "4", name: "鈴木さん", username: "@suzuki_s", isOnline: true },
-  { id: "5", name: "高橋さん", username: "@takahashi_t", isOnline: false },
-  { id: "6", name: "伊藤さん", username: "@ito_i", isOnline: true },
+  {
+    user_id: 1,
+    account_id: "tanaka123",
+    display_name: "田中太郎",
+    isOnline: true,
+  },
+  {
+    user_id: 2,
+    account_id: "sato_san",
+    display_name: "佐藤花子",
+    isOnline: false,
+  },
+  {
+    user_id: 3,
+    account_id: "yamada_y",
+    display_name: "山田美香",
+    isOnline: false,
+  },
+  {
+    user_id: 4,
+    account_id: "suzuki_s",
+    display_name: "鈴木一郎",
+    isOnline: true,
+  },
+  {
+    user_id: 5,
+    account_id: "takahashi_t",
+    display_name: "高橋健太",
+    isOnline: false,
+  },
+  {
+    user_id: 6,
+    account_id: "ito_i",
+    display_name: "伊藤さくら",
+    isOnline: true,
+  },
 ];
 
 export default function CreateGroupScreen({
@@ -43,22 +74,22 @@ export default function CreateGroupScreen({
   onClose,
 }: CreateGroupProps) {
   const [groupName, setGroupName] = useState("");
-  const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
+  const [member_ids, setMemberIds] = useState<number[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
 
   const filteredFriends = mockFriends.filter(
     (friend) =>
-      friend.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      friend.username.toLowerCase().includes(searchQuery.toLowerCase())
+      friend.display_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      friend.account_id.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const toggleFriendSelection = (friendId: string) => {
-    setSelectedFriends((prev) =>
-      prev.includes(friendId)
-        ? prev.filter((id) => id !== friendId)
-        : [...prev, friendId]
+  const toggleFriendSelection = (friendUserId: number) => {
+    setMemberIds((prev) =>
+      prev.includes(friendUserId)
+        ? prev.filter((id) => id !== friendUserId)
+        : [...prev, friendUserId]
     );
   };
 
@@ -67,12 +98,13 @@ export default function CreateGroupScreen({
       Alert.alert("エラー", "グループ名を入力してください");
       return;
     }
-    if (selectedFriends.length === 0) {
+    if (member_ids.length === 0) {
       Alert.alert("エラー", "少なくとも1人のメンバーを選択してください");
       return;
     }
 
-    // グループ作成のロジック（実際のアプリでは API コール）
+    // グループ作成のロジック
+    // POST /api/chat/groupe with: title, member_ids
     Alert.alert("成功", "グループが作成されました！", [
       {
         text: "OK",
@@ -147,7 +179,7 @@ export default function CreateGroupScreen({
           >
             <Text style={[styles.sectionTitle, { color: colors.text }]}>
               <IconSymbol name="person.2" size={20} color={colors.accent} />{" "}
-              メンバー選択 ({selectedFriends.length}人選択中)
+              メンバー選択 ({member_ids.length}人選択中)
             </Text>
 
             {/* Search */}
@@ -170,10 +202,10 @@ export default function CreateGroupScreen({
             {/* Friend List */}
             <View style={styles.friendsList}>
               {filteredFriends.map((friend) => {
-                const isSelected = selectedFriends.includes(friend.id);
+                const isSelected = member_ids.includes(friend.user_id);
                 return (
                   <TouchableOpacity
-                    key={friend.id}
+                    key={friend.user_id}
                     style={[
                       styles.friendItem,
                       {
@@ -185,7 +217,7 @@ export default function CreateGroupScreen({
                         borderColor: colors.primary,
                       },
                     ]}
-                    onPress={() => toggleFriendSelection(friend.id)}
+                    onPress={() => toggleFriendSelection(friend.user_id)}
                     activeOpacity={0.7}
                   >
                     <View style={styles.friendInfo}>
@@ -196,14 +228,14 @@ export default function CreateGroupScreen({
                         ]}
                       >
                         <Text style={styles.avatarText}>
-                          {friend.name.charAt(0)}
+                          {friend.display_name.charAt(0)}
                         </Text>
                       </View>
                       <View style={styles.friendDetails}>
                         <Text
                           style={[styles.friendName, { color: colors.text }]}
                         >
-                          {friend.name}
+                          {friend.display_name}
                         </Text>
                         <Text
                           style={[
@@ -211,7 +243,7 @@ export default function CreateGroupScreen({
                             { color: colors.placeholder },
                           ]}
                         >
-                          {friend.username}
+                          @{friend.account_id}
                         </Text>
                       </View>
                     </View>
@@ -222,18 +254,20 @@ export default function CreateGroupScreen({
           </View>
 
           {/* Selected Friends Preview */}
-          {selectedFriends.length > 0 && (
+          {member_ids.length > 0 && (
             <View style={styles.selectedSection}>
               <Text style={[styles.selectedTitle, { color: colors.text }]}>
-                選択されたメンバー ({selectedFriends.length}人)
+                選択されたメンバー ({member_ids.length}人)
               </Text>
               <View style={styles.selectedFriends}>
-                {selectedFriends.map((friendId) => {
-                  const friend = mockFriends.find((f) => f.id === friendId);
+                {member_ids.map((friendUserId) => {
+                  const friend = mockFriends.find(
+                    (f) => f.user_id === friendUserId
+                  );
                   if (!friend) return null;
                   return (
                     <View
-                      key={friendId}
+                      key={friendUserId}
                       style={[
                         styles.selectedChip,
                         { backgroundColor: colors.primary + "20" },
@@ -245,10 +279,10 @@ export default function CreateGroupScreen({
                           { color: colors.primary },
                         ]}
                       >
-                        {friend.name}
+                        {friend.display_name}
                       </Text>
                       <TouchableOpacity
-                        onPress={() => toggleFriendSelection(friendId)}
+                        onPress={() => toggleFriendSelection(friendUserId)}
                       >
                         <IconSymbol
                           name="xmark"
@@ -271,13 +305,13 @@ export default function CreateGroupScreen({
               styles.createButton,
               {
                 backgroundColor:
-                  groupName.trim() && selectedFriends.length > 0
+                  groupName.trim() && member_ids.length > 0
                     ? colors.primary
                     : colors.placeholder,
               },
             ]}
             onPress={createGroup}
-            disabled={!groupName.trim() || selectedFriends.length === 0}
+            disabled={!groupName.trim() || member_ids.length === 0}
             activeOpacity={0.8}
           >
             <IconSymbol name="plus" size={20} color="#fff" />

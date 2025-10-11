@@ -15,9 +15,15 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Colors } from "@/constants/theme";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { useUserId } from "@/hooks/use-user-id";
+import { removeUserId } from "@/utils/user-storage";
+import { router } from "expo-router";
+import { BackHandler } from "react-native";
+import { appEvents, APP_EVENTS } from "@/utils/app-events";
 
 export default function SettingsScreen() {
   const colorScheme = useColorScheme();
+  const { userId, loading, error } = useUserId();
   const [showEditModal, setShowEditModal] = useState(false);
   const [notifications, setNotifications] = useState({
     proposals: true,
@@ -38,9 +44,19 @@ export default function SettingsScreen() {
       {
         text: "ログアウト",
         style: "destructive",
-        onPress: () => {
-          // ログアウト処理を実装
-          console.log("ログアウトしました");
+        onPress: async () => {
+          try {
+            await removeUserId();
+            // ログアウトイベントを送信してルートレイアウトに状態更新を促す
+            appEvents.emit(APP_EVENTS.USER_LOGOUT);
+            Alert.alert(
+              "ログアウト完了",
+              "ログアウトしました。初回セットアップ画面に戻ります。"
+            );
+          } catch (error) {
+            console.error("ログアウトに失敗しました:", error);
+            Alert.alert("エラー", "ログアウトに失敗しました");
+          }
         },
       },
     ]);
@@ -187,6 +203,14 @@ export default function SettingsScreen() {
                 ]}
               >
                 {userProfile.name}
+              </Text>
+              <Text style={styles.profileUserId}>
+                ユーザーID:{" "}
+                {loading
+                  ? "読み込み中..."
+                  : error
+                  ? "エラー"
+                  : userId || "未設定"}
               </Text>
               <Text style={styles.profileBio} numberOfLines={2}>
                 {userProfile.bio}
@@ -609,6 +633,11 @@ const styles = StyleSheet.create({
   profileName: {
     fontSize: 16,
     fontWeight: "600",
+    marginBottom: 4,
+  },
+  profileUserId: {
+    fontSize: 12,
+    color: "#6a7282",
     marginBottom: 4,
   },
   profileBio: {

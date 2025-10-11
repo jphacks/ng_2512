@@ -18,9 +18,10 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import * as ImagePicker from "expo-image-picker";
 
 interface Photo {
-  id: string;
-  uri: string;
-  isSelected: boolean;
+  image_id: number;
+  image_url: string;
+  is_creator?: boolean;
+  isSelected?: boolean;
   isUploading?: boolean;
 }
 
@@ -44,66 +45,78 @@ export default function AlbumDetailScreen() {
   const albumTitle = "夏の思い出";
   const albumSubtitle = "12枚 • 3人で共有";
 
-  // Sample photos data
+  // API仕様に合わせたモックデータ
   const [photos, setPhotos] = useState<Photo[]>([
     {
-      id: "1",
-      uri: "https://picsum.photos/200/200?random=1",
+      image_id: 1,
+      image_url: "https://picsum.photos/200/200?random=1",
+      is_creator: true,
       isSelected: false,
     },
     {
-      id: "2",
-      uri: "https://picsum.photos/200/200?random=2",
+      image_id: 2,
+      image_url: "https://picsum.photos/200/200?random=2",
+      is_creator: false,
       isSelected: false,
     },
     {
-      id: "3",
-      uri: "https://picsum.photos/200/200?random=3",
+      image_id: 3,
+      image_url: "https://picsum.photos/200/200?random=3",
+      is_creator: true,
       isSelected: false,
     },
     {
-      id: "4",
-      uri: "https://picsum.photos/200/200?random=4",
+      image_id: 4,
+      image_url: "https://picsum.photos/200/200?random=4",
+      is_creator: false,
       isSelected: false,
     },
     {
-      id: "5",
-      uri: "https://picsum.photos/200/200?random=5",
+      image_id: 5,
+      image_url: "https://picsum.photos/200/200?random=5",
+      is_creator: true,
       isSelected: false,
     },
     {
-      id: "6",
-      uri: "https://picsum.photos/200/200?random=6",
+      image_id: 6,
+      image_url: "https://picsum.photos/200/200?random=6",
+      is_creator: false,
       isSelected: false,
     },
     {
-      id: "7",
-      uri: "https://picsum.photos/200/200?random=7",
+      image_id: 7,
+      image_url: "https://picsum.photos/200/200?random=7",
+      is_creator: true,
       isSelected: false,
     },
     {
-      id: "8",
-      uri: "https://picsum.photos/200/200?random=8",
+      image_id: 8,
+      image_url: "https://picsum.photos/200/200?random=8",
+      is_creator: false,
       isSelected: false,
     },
     {
-      id: "9",
-      uri: "https://picsum.photos/200/200?random=9",
+      image_id: 9,
+      image_url: "https://picsum.photos/200/200?random=9",
+      is_creator: true,
       isSelected: false,
     },
     {
-      id: "10",
-      uri: "https://picsum.photos/200/200?random=10",
+      image_id: 10,
+      image_url: "https://picsum.photos/200/200?random=10",
+      is_creator: false,
       isSelected: false,
     },
     {
-      id: "11",
-      uri: "https://picsum.photos/200/200?random=11",
+      image_id: 11,
+      image_url: "https://picsum.photos/200/200?random=11",
+      is_creator: true,
       isSelected: false,
     },
     {
-      id: "12",
-      uri: "https://picsum.photos/200/200?random=12",
+      image_id: 12,
+      image_url: "https://picsum.photos/200/200?random=12",
+      is_creator: false,
       isSelected: false,
     },
   ]);
@@ -129,20 +142,20 @@ export default function AlbumDetailScreen() {
 
   const selectedUserCount = users.filter((user) => user.isSelected).length;
 
-  const handlePhotoPress = (photoId: string) => {
+  const handlePhotoPress = (photoId: number) => {
     if (selectionMode) {
       setPhotos((prev) =>
         prev.map((photo) =>
-          photo.id === photoId
+          photo.image_id === photoId
             ? { ...photo, isSelected: !photo.isSelected }
             : photo
         )
       );
     } else {
       // 写真の全体表示
-      const photo = photos.find((p) => p.id === photoId);
+      const photo = photos.find((p) => p.image_id === photoId);
       if (photo) {
-        setSelectedPhotoUri(photo.uri);
+        setSelectedPhotoUri(photo.image_url);
         setShowPhotoModal(true);
       }
     }
@@ -200,8 +213,8 @@ export default function AlbumDetailScreen() {
 
         // アップロード中の写真を即座に表示
         const newUploadingPhotos = result.assets.map((asset, index) => ({
-          id: `uploading_${Date.now()}_${index}`,
-          uri: asset.uri,
+          image_id: Date.now() + index,
+          image_url: asset.uri,
           isSelected: false,
           isUploading: true,
         }));
@@ -213,8 +226,9 @@ export default function AlbumDetailScreen() {
           setTimeout(() => {
             const uploadedPhoto = {
               ...newUploadingPhotos[i],
-              id: `uploaded_${Date.now()}_${i}`,
+              image_id: Date.now() + i,
               isUploading: false,
+              is_creator: true,
             };
 
             // アップロード完了した写真を写真リストに追加
@@ -222,7 +236,9 @@ export default function AlbumDetailScreen() {
 
             // アップロード中リストから削除
             setUploadingPhotos((prev) =>
-              prev.filter((photo) => photo.id !== newUploadingPhotos[i].id)
+              prev.filter(
+                (photo) => photo.image_id !== newUploadingPhotos[i].image_id
+              )
             );
 
             // 最後の写真のアップロードが完了したら通知
@@ -263,10 +279,10 @@ export default function AlbumDetailScreen() {
           marginLeft: index % 3 === 0 ? 0 : 8,
         },
       ]}
-      onPress={() => handlePhotoPress(item.id)}
+      onPress={() => handlePhotoPress(item.image_id)}
       disabled={item.isUploading}
     >
-      <Image source={{ uri: item.uri }} style={styles.photo} />
+      <Image source={{ uri: item.image_url }} style={styles.photo} />
 
       {/* アップロード中のオーバーレイ */}
       {item.isUploading && (
@@ -344,7 +360,7 @@ export default function AlbumDetailScreen() {
         numColumns={3}
         contentContainerStyle={styles.photoGrid}
         showsVerticalScrollIndicator={false}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item.image_id.toString()}
       />
 
       {/* Settings Modal */}
