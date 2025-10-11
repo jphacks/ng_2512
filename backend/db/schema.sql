@@ -144,3 +144,66 @@ CREATE INDEX IF NOT EXISTS journal_entries_user_entry_date_idx
 
 CREATE INDEX IF NOT EXISTS journal_entry_tags_tagged_user_idx
   ON journal_entry_tags (tagged_user_id);
+
+-- =============================================================
+-- FL.1.4 — VLM Observations / Detection Entities
+-- =============================================================
+
+CREATE TABLE IF NOT EXISTS vlm_observations (
+  observation_id    TEXT PRIMARY KEY,
+  asset_id          TEXT REFERENCES assets(id) ON DELETE SET NULL,
+  observation_hash  TEXT NOT NULL UNIQUE,
+  model_version     TEXT NOT NULL,
+  prompt_payload    JSONB,
+  schedule_candidates JSONB,
+  member_candidates JSONB,
+  notes             JSONB,
+  extra_metadata    JSONB,
+  initiator_user_id BIGINT,
+  latency_ms        INTEGER,
+  processed_at      TIMESTAMPTZ DEFAULT now(),
+  created_at        TIMESTAMPTZ DEFAULT now(),
+  updated_at        TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS vlm_observations_asset_processed_idx
+  ON vlm_observations (asset_id, processed_at DESC);
+
+CREATE INDEX IF NOT EXISTS vlm_observations_processed_idx
+  ON vlm_observations (processed_at DESC);
+
+CREATE OR REPLACE FUNCTION set_updated_at_vlm_observations()
+RETURNS trigger AS $$
+BEGIN
+  NEW.updated_at := now();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DO $$
+BEGIN
+  CREATE TRIGGER vlm_observations_set_updated_at
+    BEFORE UPDATE ON vlm_observations
+    FOR EACH ROW
+    EXECUTE FUNCTION set_updated_at_vlm_observations();
+EXCEPTION WHEN duplicate_object THEN
+  NULL;
+END;
+$$;
+
+CREATE TABLE IF NOT EXISTS vlm_detection_entities (
+  id              BIGSERIAL PRIMARY KEY,
+  observation_id  TEXT NOT NULL REFERENCES vlm_observations(observation_id) ON DELETE CASCADE,
+  entity_type     TEXT NOT NULL,
+  entity_hash     TEXT UNIQUE,
+  payload         JSONB NOT NULL,
+  score           DOUBLE PRECISION,
+  extra_metadata  JSONB,
+  created_at      TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS vlm_detection_entities_observation_idx
+  ON vlm_detection_entities (observation_id);
+
+CREATE INDEX IF NOT EXISTS vlm_detection_entities_entity_type_idx
+  ON vlm_detection_entities (entity_type);
