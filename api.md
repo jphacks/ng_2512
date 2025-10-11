@@ -29,7 +29,8 @@ GET
         location: string,
         creator_id: int,
         created_at: datetime,
-        deadline_at: datetime
+        deadline_at: datetime,
+        status: enum,
         participants: [
             {
                 user_id: int,
@@ -46,6 +47,18 @@ GET
 
 ユーザーに提案された提案をすべて取得。
 (締切日を超えたもの、成立したもの、不成立のものは除く)
+```
+
+```
+UPDATE
+/api/proposal/[proposal_id]
+{
+    user_id: int,
+    status: enum
+},
+{
+    とくになし
+}
 ```
 
 ```
