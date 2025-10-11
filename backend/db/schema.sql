@@ -44,3 +44,77 @@ DO $$ BEGIN
 EXCEPTION WHEN undefined_object THEN
   NULL;
 END $$;
+
+-- =============================================================
+-- FL.1.2 — Theme Vocab / Embeddings / Suggestions
+-- =============================================================
+
+-- Vocabulary sets act as logical bundles for each locale/version.
+CREATE TABLE IF NOT EXISTS theme_vocab_sets (
+  id           BIGSERIAL PRIMARY KEY,
+  code         TEXT NOT NULL UNIQUE,
+  lang         TEXT NOT NULL DEFAULT 'ja',
+  description  TEXT,
+  is_active    BOOLEAN NOT NULL DEFAULT false,
+  activated_at TIMESTAMPTZ,
+  created_at   TIMESTAMPTZ DEFAULT now()
+);
+
+-- Only one active set per locale to support rollout toggles.
+DO $$ BEGIN
+  CREATE UNIQUE INDEX IF NOT EXISTS uniq_active_vocab_set_per_lang
+    ON theme_vocab_sets (lang)
+    WHERE (is_active = true);
+EXCEPTION WHEN others THEN
+  NULL;
+END $$;
+
+-- Individual vocab entries scoped to a set.
+CREATE TABLE IF NOT EXISTS theme_vocab (
+  id         BIGSERIAL PRIMARY KEY,
+  set_id     BIGINT NOT NULL REFERENCES theme_vocab_sets(id) ON DELETE CASCADE,
+  name       TEXT NOT NULL,
+  normalized TEXT,
+  tags       JSONB,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE (set_id, name)
+);
+
+-- Embeddings per vocab item and model version.
+CREATE TABLE IF NOT EXISTS theme_embeddings (
+  theme_id   BIGINT NOT NULL REFERENCES theme_vocab(id) ON DELETE CASCADE,
+  model      TEXT NOT NULL,
+  embedding  VECTOR(768) NOT NULL,
+  current    BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  PRIMARY KEY (theme_id, model)
+);
+
+-- Ensure only one embedding is marked current for a vocab entry.
+DO $$ BEGIN
+  CREATE UNIQUE INDEX IF NOT EXISTS uniq_current_theme_embed
+    ON theme_embeddings (theme_id)
+    WHERE (current = true);
+EXCEPTION WHEN others THEN
+  NULL;
+END $$;
+
+-- Optional IVF index for ANN search, skipped if vector ops unavailable.
+DO $$ BEGIN
+  CREATE INDEX IF NOT EXISTS theme_embeddings_ivf
+    ON theme_embeddings USING ivfflat (embedding vector_l2_ops) WITH (lists = 100);
+EXCEPTION WHEN undefined_object THEN
+  NULL;
+END $$;
+
+-- Suggestion log for auditability and AB testing.
+CREATE TABLE IF NOT EXISTS theme_suggestions (
+  id           BIGSERIAL PRIMARY KEY,
+  user_id      BIGINT REFERENCES users(id),
+  asset_id     TEXT REFERENCES assets(id) ON DELETE SET NULL,
+  set_id       BIGINT REFERENCES theme_vocab_sets(id) ON DELETE SET NULL,
+  model        TEXT NOT NULL,
+  topk         JSONB NOT NULL,
+  selected_id  BIGINT REFERENCES theme_vocab(id),
+  created_at   TIMESTAMPTZ DEFAULT now()
+);
