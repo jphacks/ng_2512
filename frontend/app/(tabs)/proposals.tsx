@@ -114,7 +114,7 @@ export default function ProposalsScreen() {
     const weekday = ["日", "月", "火", "水", "木", "金", "土"][date.getDay()];
     const hours = date.getHours();
     const minutes = date.getMinutes().toString().padStart(2, "0");
-    
+
     return `${month}月${day}日(${weekday}) ${hours}:${minutes}〜`;
   };
 
@@ -158,15 +158,15 @@ export default function ProposalsScreen() {
   };
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: "#F5F5F5" }]}
-    >
+    <SafeAreaView style={[styles.container, { backgroundColor: "#F5F5F5" }]}>
       {/* Header */}
       <View style={[styles.header, { backgroundColor: "#FFFFFF" }]}>
         <View style={styles.headerContent}>
           <View style={styles.headerLeft}>
             <Text style={[styles.headerTitle, { color: "#1E2939" }]}>提案</Text>
-            <Text style={[styles.headerSubtitle, { color: "#6A7282" }]}>友達からの提案をチェック</Text>
+            <Text style={[styles.headerSubtitle, { color: "#6A7282" }]}>
+              友達からの提案をチェック
+            </Text>
           </View>
           <View style={styles.headerRight}>
             <TouchableOpacity style={styles.headerIconButton}>
@@ -207,7 +207,9 @@ export default function ProposalsScreen() {
         <View style={styles.statsContainer}>
           <View style={[styles.statCard, { backgroundColor: "#FFFFFF" }]}>
             <Text style={[styles.statNumber, { color: "#2B7FFF" }]}>2</Text>
-            <Text style={[styles.statLabel, { color: "#4A5565" }]}>新着提案</Text>
+            <Text style={[styles.statLabel, { color: "#4A5565" }]}>
+              新着提案
+            </Text>
           </View>
           <View style={[styles.statCard, { backgroundColor: "#FFFFFF" }]}>
             <Text style={[styles.statNumber, { color: "#00C950" }]}>1</Text>
@@ -215,95 +217,112 @@ export default function ProposalsScreen() {
           </View>
           <View style={[styles.statCard, { backgroundColor: "#FFFFFF" }]}>
             <Text style={[styles.statNumber, { color: "#AD46FF" }]}>0</Text>
-            <Text style={[styles.statLabel, { color: "#4A5565" }]}>承認済み</Text>
+            <Text style={[styles.statLabel, { color: "#4A5565" }]}>
+              承認済み
+            </Text>
           </View>
         </View>
 
         {/* Proposals List */}
         <View style={styles.proposalsSection}>
           <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: "#1E2939" }]}>提案一覧</Text>
+            <Text style={[styles.sectionTitle, { color: "#1E2939" }]}>
+              提案一覧
+            </Text>
             <View style={styles.countBadge}>
               <Text style={[styles.countText, { color: "#155DFC" }]}>3件</Text>
             </View>
           </View>
-          
-          {proposals.filter((p) => !isExpired(p)).map((item, index) => (
-            <Animated.View
-              key={item.id}
-              style={[
-                styles.proposalCard,
-                {
-                  opacity: fadeAnim,
-                  transform: [
-                    {
-                      translateY: slideAnim.interpolate({
-                        inputRange: [0, 50],
-                        outputRange: [0, 50],
-                      }),
-                    },
-                  ],
-                },
-              ]}
-            >
-              <TouchableOpacity
-                onPress={() => setSelectedProposal(item)}
-                activeOpacity={0.7}
-                style={styles.cardTouchable}
-              >
-                {/* Card Header */}
-                <View style={styles.cardHeader}>
-                  <Text style={[styles.proposalTitle, { color: "#1E2939" }]}>
-                    {item.title}
-                  </Text>
-                  <View style={styles.statusBadge}>
-                    <Text style={[styles.statusText, { color: "#894B00" }]}>待機中</Text>
-                  </View>
-                </View>
 
-                {/* Card Info */}
-                <View style={styles.cardInfo}>
-                  <View style={styles.infoRow}>
-                    <IconSymbol name="location" size={16} color="#4A5565" />
-                    <Text style={[styles.infoText, { color: "#4A5565" }]}>
-                      {item.location}
+          {proposals
+            .filter((p) => !isExpired(p))
+            .map((item, index) => (
+              <Animated.View
+                key={item.id}
+                style={[
+                  styles.proposalCard,
+                  {
+                    opacity: fadeAnim,
+                    transform: [
+                      {
+                        translateY: slideAnim.interpolate({
+                          inputRange: [0, 50],
+                          outputRange: [0, 50],
+                        }),
+                      },
+                    ],
+                  },
+                ]}
+              >
+                <TouchableOpacity
+                  onPress={() => setSelectedProposal(item)}
+                  activeOpacity={0.7}
+                  style={styles.cardTouchable}
+                >
+                  {/* Card Header */}
+                  <View style={styles.cardHeader}>
+                    <Text style={[styles.proposalTitle, { color: "#1E2939" }]}>
+                      {item.title}
                     </Text>
+                    <View style={styles.statusBadge}>
+                      <Text style={[styles.statusText, { color: "#894B00" }]}>
+                        待機中
+                      </Text>
+                    </View>
                   </View>
-                  <View style={styles.infoRow}>
-                    <IconSymbol name="calendar" size={16} color="#4A5565" />
-                    <Text style={[styles.infoText, { color: "#4A5565" }]}>
-                      {formatDate(item.datetime)}
-                    </Text>
-                    {item.participants.length > 1 && (
-                      <Text style={[styles.moreText, { color: "#99A1AF" }]}>他{item.participants.length - 1}件</Text>
-                    )}
+
+                  {/* Card Info */}
+                  <View style={styles.cardInfo}>
+                    <View style={styles.infoRow}>
+                      <IconSymbol name="location" size={16} color="#4A5565" />
+                      <Text style={[styles.infoText, { color: "#4A5565" }]}>
+                        {item.location}
+                      </Text>
+                    </View>
+                    <View style={styles.infoRow}>
+                      <IconSymbol name="calendar" size={16} color="#4A5565" />
+                      <Text style={[styles.infoText, { color: "#4A5565" }]}>
+                        {formatDate(item.datetime)}
+                      </Text>
+                      {item.participants.length > 1 && (
+                        <Text style={[styles.moreText, { color: "#99A1AF" }]}>
+                          他{item.participants.length - 1}件
+                        </Text>
+                      )}
+                    </View>
+                    <View style={styles.infoRow}>
+                      <IconSymbol name="person.2" size={16} color="#4A5565" />
+                      <Text style={[styles.infoText, { color: "#4A5565" }]}>
+                        {item.participants.length}人
+                      </Text>
+                      {item.acceptedCount > 0 && (
+                        <Text
+                          style={[styles.acceptedInfo, { color: "#155DFC" }]}
+                        >
+                          {item.acceptedCount}/{item.participants.length}
+                          人が承認
+                        </Text>
+                      )}
+                    </View>
                   </View>
-                  <View style={styles.infoRow}>
-                    <IconSymbol name="person.2" size={16} color="#4A5565" />
-                    <Text style={[styles.infoText, { color: "#4A5565" }]}>
-                      {item.participants.length}人
-                    </Text>
-                    {item.acceptedCount > 0 && (
-                      <Text style={[styles.acceptedInfo, { color: "#155DFC" }]}>
-                        {item.acceptedCount}/{item.participants.length}人が承認
+
+                  {/* Card Footer */}
+                  <View style={styles.cardFooter}>
+                    <View style={styles.timeInfo}>
+                      <IconSymbol name="clock" size={12} color="#6A7282" />
+                      <Text style={[styles.timeText, { color: "#6A7282" }]}>
+                        あと5日
+                      </Text>
+                    </View>
+                    {item.createdBy === "あなた" && (
+                      <Text style={[styles.ownProposal, { color: "#155DFC" }]}>
+                        自分の提案
                       </Text>
                     )}
                   </View>
-                </View>
-
-                {/* Card Footer */}
-                <View style={styles.cardFooter}>
-                  <View style={styles.timeInfo}>
-                    <IconSymbol name="clock" size={12} color="#6A7282" />
-                    <Text style={[styles.timeText, { color: "#6A7282" }]}>あと5日</Text>
-                  </View>
-                  {item.createdBy === "あなた" && (
-                    <Text style={[styles.ownProposal, { color: "#155DFC" }]}>自分の提案</Text>
-                  )}
-                </View>
-              </TouchableOpacity>
-            </Animated.View>
-          ))}
+                </TouchableOpacity>
+              </Animated.View>
+            ))}
         </View>
       </ScrollView>
 
