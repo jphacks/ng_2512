@@ -13,8 +13,10 @@
 ## 追加ファイル
 - `deploy/docker-compose.yml`: 本番用 Compose（api + 任意の db/redis/vllm は profiles で有効化）
 - `deploy/.env.deploy.example`: サーバで `deploy/.env` として使用するテンプレート
+- `deploy/.env.production.example`: シークレットマネージャ登録用のリファレンス。`deploy/.env` と内容を同期させる。
 - `scripts/deploy/server_deploy.sh`: 指定タグを配備し、マイグレーション・ヘルス確認・失敗時ロールバックを実行
 - `scripts/deploy/server_rollback.sh`: 手動ロールバック用ヘルパー
+- `scripts/smoke/smoke_test.sh`: `/healthz` `/readyz` `/version` を確認するスモークテスト
 
 ## 基本的な配備手順（サーバ上）
 1) リポジトリ（または `deploy/` と `scripts/deploy/`）をサーバへ配置
@@ -31,7 +33,7 @@ scripts/deploy/server_deploy.sh \
 ```
 4) ヘルス確認
 ```
-curl -fsS $(grep HEALTHCHECK_URL deploy/.env | cut -d= -f2)
+./scripts/smoke/smoke_test.sh "$(grep HEALTHCHECK_URL deploy/.env | cut -d= -f2 | sed 's#/readyz$##')"
 ```
 
 ## ロールバック
@@ -86,3 +88,4 @@ scripts/deploy/server_rollback.sh --to-tag sha-<previous>
 - マイグレーションは `flask db upgrade` をベストエフォートで実行します。Flask-Migrate 未導入のスケルトンでは実質 no-op（または非ゼロ終了）になり得ます。
 - リリース履歴は `deploy/releases.log` にタグやダイジェスト付きで追記されます。
 - `deploy/.env` の実値はサーバ側のみで管理し、リポジトリにコミットしないでください。
+- スモークテスト結果を `deploy/releases.log` へ追記すると追跡しやすくなります（例: `2025-09-30T12:34:56Z,smoke,success,http://127.0.0.1:8000,sha-abcdef`）。

@@ -138,6 +138,8 @@ celerybeat.pid
 .env
 .env.*
 !.env.example
+!deploy/.env.deploy.example
+!deploy/.env.production.example
 .envrc
 .venv
 env/

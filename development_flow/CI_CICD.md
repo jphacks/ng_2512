@@ -31,6 +31,11 @@
 ## CI.5 本番移植/カットオーバー（Infra/Secrets/Data）
 - 本番 compose/環境テンプレ、Secrets 管理、データ移行計画、Runbook 整備。
 - Blue-Green または最小ダウンタイム切替、即時ロールバック、スモークテスト。
+- 成果物:
+  - `deploy/.env.deploy.example`, `deploy/.env.production.example`
+  - `scripts/smoke/smoke_test.sh`
+  - 更新済み Runbook `docs/dev/runbooks/production_migration.md`
+  - Secrets/ログ運用の追記 `docs/dev/deploy_server.md`
 
 ## CI.6 Mobile Web E2E（React Native / Expo）
 - 目的: RN（Expo Web）の統合E2E（UIスモーク、Firebase初期化、API疎通）をCIで自動検証する。
