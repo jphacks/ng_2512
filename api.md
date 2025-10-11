@@ -117,3 +117,18 @@ GET
 ]
 oldest_chat_id以前のチャットを20件ずつ取得
 ```
+
+```
+POST
+/api/chat/[groupe_id]
+{
+    user_id: string
+},
+[
+    {
+        body: string,
+        image: binary
+    },
+    ...
+]
+```
