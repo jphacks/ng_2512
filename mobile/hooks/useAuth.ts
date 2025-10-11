@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import auth from '@react-native-firebase/auth';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
+import { initUserProfile } from '../src/services/profile';
 
 // Configure Google Sign-In
 // You must configure this with your webClientId
@@ -37,6 +38,8 @@ export function useAuth() {
       // Sign-in the user with the credential
       const userCredential = await auth().signInWithCredential(googleCredential);
       setUser(userCredential.user);
+      // Initialize Firestore user profile document if absent
+      try { await initUserProfile(); } catch (_) { /* surface only auth error */ }
       return userCredential.user;
     } catch (e) {
       setError(e);
