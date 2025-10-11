@@ -1,0 +1,81 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: recall
+      POSTGRES_PASSWORD: recall
+      POSTGRES_DB: recall
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U recall"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    ports:
+      - "6379:6379"
+
+  vllm:
+    image: python:3.11-slim
+    command: [
+      "python",
+      "-c",
+      "from http.server import BaseHTTPRequestHandler, HTTPServer;\n"
+      "class Handler(BaseHTTPRequestHandler):\n"
+      "    def do_GET(self):\n"
+      "        self.send_response(200);\n"
+      "        self.send_header('Content-Type','application/json');\n"
+      "        self.end_headers();\n"
+      "        self.wfile.write(b'{\\"status\\":\\"ok\\"}');\n"
+      "    def log_message(self, format, *args):\n"
+      "        return\n"
+      "HTTPServer(('0.0.0.0',8008), Handler).serve_forever()"
+    ]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8008/healthz').read()"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    ports:
+      - "8008:8008"
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: test
+    environment:
+      DATABASE_URL: postgresql://recall:recall@db:5432/recall
+      REDIS_URL: redis://redis:6379/0
+      VLLM_ENDPOINT: http://vllm:8008
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      vllm:
+        condition: service_healthy
+    command: [
+      "bash",
+      "-lc",
+      "python scripts/wait_for_dependencies.py --host db --port 5432 --host redis --port 6379 --host vllm --port 8008 --timeout 60 && pytest -q"
+    ]
+    volumes:
+      - ./backend:/app/backend:ro
+    working_dir: /app
+
+volumes:
+  postgres-data:
