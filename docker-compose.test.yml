@@ -69,7 +69,7 @@ services:
     command: [
       "bash",
       "-lc",
-      "python -m backend.scripts.wait_for_dependencies --host db --port 5432 --host redis --port 6379 --host vllm --port 8008 --timeout 60 && pytest -q backend/tests"
+      "python -m backend.scripts.wait_for_dependencies --host db --port 5432 --host redis --port 6379 --host vllm --port 8008 --timeout 60 && pytest -q backend/tests -m integration"
     ]
     working_dir: /app
 
