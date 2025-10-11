@@ -13,7 +13,7 @@
   "dependencies": {
     "@react-navigation/native": "^6.1.17",
     "@react-navigation/native-stack": "^6.9.25",
-    "expo": "~51.0.8",
+    "expo": "~51.0.13",
     "expo-linking": "~5.0.1",
     "expo-status-bar": "~1.12.1",
     "react": "18.2.0",
