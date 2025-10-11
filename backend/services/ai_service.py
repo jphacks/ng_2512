@@ -296,14 +296,23 @@ class AIService:
 
     @staticmethod
     def _cosine_similarity(lhs: Sequence[float], rhs: Sequence[float]) -> float:
-        if not lhs or not rhs:
+        lhs_len = len(lhs)
+        rhs_len = len(rhs)
+        if lhs_len == 0 or rhs_len == 0:
             return 0.0
-        numerator = sum(float(a) * float(b) for a, b in zip(lhs, rhs))
-        lhs_norm = math.sqrt(sum(float(a) ** 2 for a in lhs))
-        rhs_norm = math.sqrt(sum(float(b) ** 2 for b in rhs))
-        if lhs_norm == 0 or rhs_norm == 0:
+
+        numerator = 0.0
+        lhs_norm_sq = 0.0
+        rhs_norm_sq = 0.0
+        for left, right in zip(lhs, rhs):
+            a = float(left)
+            b = float(right)
+            numerator += a * b
+            lhs_norm_sq += a * a
+            rhs_norm_sq += b * b
+        if lhs_norm_sq == 0.0 or rhs_norm_sq == 0.0:
             return 0.0
-        return numerator / (lhs_norm * rhs_norm)
+        return numerator / math.sqrt(lhs_norm_sq * rhs_norm_sq)
 
     def _build_theme_prompt(
         self,
