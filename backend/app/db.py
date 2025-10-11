@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
 import secrets
 from pathlib import Path
-from typing import Iterable, Iterator, List, Sequence
+from typing import Iterable, Iterator, List, Optional, Sequence
 
 from sqlalchemy import (
     JSON,
@@ -348,6 +348,38 @@ class AIProposalSuggestion:
     event_date: datetime
     location: str | None
     participant_ids: List[int]
+
+
+@dataclass
+class FriendUserData:
+    """Friend overview payload with relationship metadata."""
+
+    user_id: int
+    account_id: str
+    display_name: str
+    icon_asset_url: str | None
+    updated_at: datetime
+
+
+@dataclass
+class FriendOverview:
+    """Collection of friend relationship categories."""
+
+    friend: List[FriendUserData] = field(default_factory=list)
+    friend_requested: List[FriendUserData] = field(default_factory=list)
+    friend_recommended: List[FriendUserData] = field(default_factory=list)
+    friend_requesting: List[FriendUserData] = field(default_factory=list)
+    friend_blocked: List[FriendUserData] = field(default_factory=list)
+
+
+@dataclass
+class FriendSearchResult:
+    """Search result payload for user lookup."""
+
+    user_id: int
+    account_id: str
+    display_name: str
+    icon_asset_url: str | None
 
 
 # --- Session utilities -----------------------------------------------------
@@ -989,3 +1021,321 @@ def _initialize_sqlite_schema() -> None:
 
 
 _initialize_sqlite_schema()
+
+
+# --- Friend queries --------------------------------------------------------
+
+_FRIEND_STATUS_CATEGORIES = {
+    "friend",
+    "requested",
+    "requesting",
+    "recommended",
+    "blocked",
+}
+
+
+def _user_payload(user: User, updated_at: datetime) -> FriendUserData:
+    return FriendUserData(
+        user_id=user.id,
+        account_id=getattr(user, "account_id", "") or "",
+        display_name=user.display_name or "",
+        icon_asset_url=getattr(user, "icon_asset_url", None),
+        updated_at=updated_at,
+    )
+
+
+def fetch_friend_overview(session: Session, user_id: int) -> FriendOverview:
+    """Return categorized friend relationships for the user."""
+    overview = FriendOverview()
+
+    def _status_filter(column, statuses: set[str]):
+        lowered = {status.lower() for status in statuses}
+        cleaned = func.lower(func.trim(column))
+        return cleaned.in_(lowered)
+
+    def _rows_to_payload(rows: list[tuple[UserFriendship, User]]) -> list[FriendUserData]:
+        result: dict[int, FriendUserData] = {}
+        for relationship, user in rows:
+            updated_at = relationship.updated_at or datetime.now(timezone.utc)
+            payload = _user_payload(user, updated_at)
+            existing = result.get(payload.user_id)
+            if existing is None or existing.updated_at < payload.updated_at:
+                result[payload.user_id] = payload
+        return sorted(result.values(), key=lambda item: item.updated_at, reverse=True)
+
+    # Friends the user has confirmed
+    friend_rows = session.execute(
+        select(UserFriendship, User)
+        .join(User, User.id == UserFriendship.friend_user_id)
+        .where(UserFriendship.user_id == user_id)
+        .where(_status_filter(UserFriendship.status, {"friend"}))
+    ).all()
+    overview.friend = _rows_to_payload(friend_rows)
+
+    # Requests awaiting the user's decision (others requested the user)
+    requested_rows = session.execute(
+        select(UserFriendship, User)
+        .join(User, User.id == UserFriendship.user_id)
+        .where(UserFriendship.friend_user_id == user_id)
+        .where(_status_filter(UserFriendship.status, {"requested", "requesting"}))
+    ).all()
+    overview.friend_requested = _rows_to_payload(requested_rows)
+
+    # Requests the user has sent and are awaiting the other party
+    requesting_rows = session.execute(
+        select(UserFriendship, User)
+        .join(User, User.id == UserFriendship.friend_user_id)
+        .where(UserFriendship.user_id == user_id)
+        .where(_status_filter(UserFriendship.status, {"requesting"}))
+    ).all()
+    overview.friend_requesting = _rows_to_payload(requesting_rows)
+
+    # Recommendations (either side)
+    recommended_outgoing = session.execute(
+        select(UserFriendship, User)
+        .join(User, User.id == UserFriendship.friend_user_id)
+        .where(UserFriendship.user_id == user_id)
+        .where(_status_filter(UserFriendship.status, {"recommended"}))
+    ).all()
+    recommended_incoming = session.execute(
+        select(UserFriendship, User)
+        .join(User, User.id == UserFriendship.user_id)
+        .where(UserFriendship.friend_user_id == user_id)
+        .where(_status_filter(UserFriendship.status, {"recommended"}))
+    ).all()
+    overview.friend_recommended = _rows_to_payload(recommended_outgoing + recommended_incoming)
+
+    # Blocked users (user initiated block)
+    blocked_rows = session.execute(
+        select(UserFriendship, User)
+        .join(User, User.id == UserFriendship.friend_user_id)
+        .where(UserFriendship.user_id == user_id)
+        .where(_status_filter(UserFriendship.status, {"blocked"}))
+    ).all()
+    overview.friend_blocked = _rows_to_payload(blocked_rows)
+
+    return overview
+
+
+def search_users(
+    session: Session,
+    *,
+    input_text: str,
+    limit: int = 20,
+) -> list[FriendSearchResult]:
+    """Search users by account id or display name (case-insensitive)."""
+    if not input_text:
+        return []
+
+    pattern = f"%{input_text.lower()}%"
+    rows = session.execute(
+        select(User)
+        .where(
+            or_(
+                func.lower(User.display_name).like(pattern),
+                func.lower(User.account_id).like(pattern),
+            )
+        )
+        .order_by(User.id.desc())
+        .limit(limit)
+    ).scalars().all()
+
+    return [
+        FriendSearchResult(
+            user_id=user.id,
+            account_id=getattr(user, "account_id", "") or "",
+            display_name=user.display_name or "",
+            icon_asset_url=getattr(user, "icon_asset_url", None),
+        )
+        for user in rows
+    ]
+
+
+def _upsert_friendship(
+    session: Session,
+    user_id: int,
+    friend_user_id: int,
+    status: str,
+    *,
+    now: datetime,
+) -> None:
+    relationship = session.get(UserFriendship, (user_id, friend_user_id))
+    if relationship is None:
+        session.add(
+            UserFriendship(
+                user_id=user_id,
+                friend_user_id=friend_user_id,
+                status=status,
+                updated_at=now,
+            )
+        )
+    else:
+        relationship.status = status
+        relationship.updated_at = now
+
+
+_RECIPROCAL_STATUS: dict[str, str] = {
+    "friend": "friend",
+    "requested": "requesting",
+    "requesting": "requested",
+    "recommended": "recommended",
+    "blocked": "blocked",
+}
+
+
+def update_friend_request(
+    session: Session,
+    *,
+    user_id: int,
+    friend_user_id: int,
+    updated_status: str,
+) -> None:
+    """Update friendship state in both directions."""
+    if updated_status not in _FRIEND_STATUS_CATEGORIES:
+        raise ValueError("Unsupported friend status.")
+    if user_id == friend_user_id:
+        raise ValueError("Cannot update friendship with self.")
+
+    reciprocal = _RECIPROCAL_STATUS[updated_status]
+    now = datetime.now(timezone.utc)
+
+    _upsert_friendship(session, user_id, friend_user_id, updated_status, now=now)
+    _upsert_friendship(session, friend_user_id, user_id, reciprocal, now=now)
+
+    session.commit()
+
+
+# --- User management -------------------------------------------------------
+
+
+def _generate_asset_id() -> str:
+    return f"asset-{secrets.token_hex(12)}"
+
+
+def _create_asset(
+    session: Session,
+    *,
+    owner_id: int,
+    storage_key: str,
+    content_type: str,
+    created_at: Optional[datetime] = None,
+) -> tuple[str, str]:
+    created = created_at or datetime.now(timezone.utc)
+    asset_id = _generate_asset_id()
+    session.add(
+        Asset(
+            id=asset_id,
+            owner_id=owner_id,
+            content_type=content_type,
+            storage_key=storage_key,
+            created_at=created,
+        )
+    )
+    session.flush()
+    return asset_id, storage_key
+
+
+def upsert_user(
+    session: Session,
+    *,
+    account_id: str,
+    display_name: str,
+    icon_image: Optional[str],
+    face_image: str,
+    profile_text: Optional[str],
+) -> int:
+    """Create or replace a user identified by account_id."""
+    user = session.execute(
+        select(User).where(User.account_id == account_id)
+    ).scalar_one_or_none()
+
+    now = datetime.now(timezone.utc)
+    if user is None:
+        user = User(
+            account_id=account_id,
+            display_name=display_name,
+            icon_asset_url=None,
+            face_asset_url=None,
+            profile_text=profile_text,
+            assets_id="",
+        )
+        session.add(user)
+        session.flush()
+    else:
+        user.display_name = display_name
+        user.profile_text = profile_text
+
+    if not face_image:
+        raise ValueError("face_image is required.")
+
+    face_asset_id, face_url = _create_asset(
+        session,
+        owner_id=user.id,
+        storage_key=face_image,
+        content_type="image/jpeg",
+        created_at=now,
+    )
+    user.assets_id = face_asset_id
+    user.face_asset_url = face_url
+
+    if icon_image is not None:
+        _, icon_url = _create_asset(
+            session,
+            owner_id=user.id,
+            storage_key=icon_image,
+            content_type="image/png",
+            created_at=now,
+        )
+        user.icon_asset_url = icon_url
+    else:
+        user.icon_asset_url = None
+
+    session.commit()
+    return user.id
+
+
+def update_user_profile(
+    session: Session,
+    *,
+    user_id: int,
+    account_id: str,
+    display_name: str,
+    icon_image: Optional[str],
+    face_image: Optional[str],
+    profile_text: Optional[str],
+) -> None:
+    """Update an existing user's profile."""
+    user = session.get(User, user_id)
+    if user is None:
+        raise ValueError("User not found.")
+
+    user.account_id = account_id
+    user.display_name = display_name
+    user.profile_text = profile_text
+
+    now = datetime.now(timezone.utc)
+
+    if face_image is not None:
+        face_asset_id, face_url = _create_asset(
+            session,
+            owner_id=user.id,
+            storage_key=face_image,
+            content_type="image/jpeg",
+            created_at=now,
+        )
+        user.assets_id = face_asset_id
+        user.face_asset_url = face_url
+
+    if icon_image is None or icon_image == "":
+        user.icon_asset_url = None
+    else:
+        _, icon_url = _create_asset(
+            session,
+            owner_id=user.id,
+            storage_key=icon_image,
+            content_type="image/png",
+            created_at=now,
+        )
+        user.icon_asset_url = icon_url
+
+    session.commit()

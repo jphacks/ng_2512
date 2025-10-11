@@ -9,10 +9,11 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, text as sa_text
 from sqlalchemy.engine import URL, make_url
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.util import typing as sa_typing
+from sqlalchemy.exc import OperationalError
 
 
 def _load_env() -> None:
@@ -96,6 +97,18 @@ def _load_db_module(db_url: str, *, create_schema: bool) -> typing.Any:
     db_module.Proposal.__table__.c.deadline_at.nullable = True
     if create_schema:
         db_module.Base.metadata.create_all(bind=db_module.engine)
+
+    # Validate connectivity for real databases; fall back to temporary SQLite if unreachable
+    backend_name = make_url(db_url).get_backend_name()
+    if backend_name != "sqlite":
+        try:
+            with db_module.engine.connect() as connection:
+                connection.execute(sa_text("SELECT 1"))
+        except OperationalError:
+            temp_sqlite = f"sqlite:///{DB_FILE}"
+            db_module.engine.dispose()
+            return _load_db_module(temp_sqlite, create_schema=True)
+
     return db_module
 
 
@@ -399,6 +412,105 @@ def test_album_flow(session):
     )
     assert is_creator_view is False
     assert len(shared_photos) == 2
+
+
+def test_friend_overview_and_request_flow(session):
+    alice_id = _next_test_id()
+    bob_id = _next_test_id()
+    carol_id = _next_test_id()
+    dave_id = _next_test_id()
+
+    _create_user(session, alice_id, "Alice")
+    _create_user(session, bob_id, "Bob")
+    _create_user(session, carol_id, "Carol")
+    _create_user(session, dave_id, "Dave")
+
+    db.update_friend_request(
+        session,
+        user_id=alice_id,
+        friend_user_id=bob_id,
+        updated_status="requesting",
+    )
+
+    overview_for_bob = db.fetch_friend_overview(session, user_id=bob_id)
+    assert len(overview_for_bob.friend_requested) == 1
+    assert overview_for_bob.friend_requested[0].user_id == alice_id
+
+    db.update_friend_request(
+        session,
+        user_id=bob_id,
+        friend_user_id=alice_id,
+        updated_status="friend",
+    )
+
+    overview_for_alice = db.fetch_friend_overview(session, user_id=alice_id)
+    assert {item.user_id for item in overview_for_alice.friend} == {bob_id}
+
+    db.update_friend_request(
+        session,
+        user_id=alice_id,
+        friend_user_id=carol_id,
+        updated_status="blocked",
+    )
+    db.update_friend_request(
+        session,
+        user_id=alice_id,
+        friend_user_id=dave_id,
+        updated_status="recommended",
+    )
+
+    refreshed_overview = db.fetch_friend_overview(session, user_id=alice_id)
+    assert {item.user_id for item in refreshed_overview.friend_blocked} == {carol_id}
+    assert {item.user_id for item in refreshed_overview.friend_recommended} == {dave_id}
+
+
+def test_user_upsert_and_search(session):
+    account_id = f"acct-{uuid.uuid4().hex[:6]}"
+    created_id = db.upsert_user(
+        session,
+        account_id=account_id,
+        display_name="Tester One",
+        icon_image="icon://one",
+        face_image="face://one",
+        profile_text="First profile",
+    )
+    stored_user = session.get(db.User, created_id)
+    assert stored_user is not None
+    assert stored_user.display_name == "Tester One"
+    assert stored_user.face_asset_url == "face://one"
+    assert stored_user.icon_asset_url == "icon://one"
+
+    updated_id = db.upsert_user(
+        session,
+        account_id=account_id,
+        display_name="Tester Updated",
+        icon_image=None,
+        face_image="face://updated",
+        profile_text=None,
+    )
+    assert updated_id == created_id
+    session.refresh(stored_user)
+    assert stored_user.display_name == "Tester Updated"
+    assert stored_user.icon_asset_url is None
+    assert stored_user.face_asset_url == "face://updated"
+
+    db.update_user_profile(
+        session,
+        user_id=created_id,
+        account_id=f"{account_id}-2",
+        display_name="Tester Final",
+        icon_image="icon://final",
+        face_image=None,
+        profile_text="Updated profile text",
+    )
+    session.refresh(stored_user)
+    assert stored_user.account_id.endswith("-2")
+    assert stored_user.display_name == "Tester Final"
+    assert stored_user.icon_asset_url == "icon://final"
+    assert stored_user.profile_text == "Updated profile text"
+
+    results = db.search_users(session, input_text="tester")
+    assert any(item.user_id == created_id for item in results)
 
 
 def test_get_session_context_manager(session):

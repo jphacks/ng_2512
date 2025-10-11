@@ -201,6 +201,67 @@ class AlbumUpdateRequest(BaseModel):
         return users
 
 
+class FriendUserDetailResponse(BaseModel):
+    user_id: int
+    account_id: str
+    display_name: str
+    icon_asset_url: str | None = None
+    updated_at: datetime
+
+
+class FriendOverviewResponse(BaseModel):
+    friend: List[FriendUserDetailResponse] = Field(default_factory=list)
+    friend_requested: List[FriendUserDetailResponse] = Field(default_factory=list)
+    friend_recommended: List[FriendUserDetailResponse] = Field(default_factory=list)
+    friend_requesting: List[FriendUserDetailResponse] = Field(default_factory=list)
+    friend_blocked: List[FriendUserDetailResponse] = Field(default_factory=list)
+
+
+class FriendSearchResponse(BaseModel):
+    user_id: int
+    account_id: str
+    display_name: str
+    icon_asset_url: str | None = None
+
+
+class FriendRequestUpdateRequest(BaseModel):
+    user_id: int
+    friend_user_id: int
+    updated_status: str
+
+    @field_validator("updated_status")
+    @classmethod
+    def validate_status(cls, value: str) -> str:
+        allowed = {"friend", "requested", "requesting", "recommended", "blocked"}
+        if value not in allowed:
+            raise ValueError(f"updated_status must be one of {sorted(allowed)}")
+        return value
+
+
+class UserCreateRequest(BaseModel):
+    account_id: str
+    display_name: str
+    icon_image: str | None = None
+    face_image: str
+    profile_text: str | None = None
+
+    @field_validator("face_image")
+    @classmethod
+    def ensure_face_image(cls, value: str) -> str:
+        if not value:
+            raise ValueError("face_image is required.")
+        return value
+
+
+class UserUpdateRequest(BaseModel):
+    user_id: int
+    account_id: str
+    display_name: str
+    icon_image: str | None = None
+    face_image: str | None = None
+    profile_text: str | None = None
+
+
 # --- FastAPI factory -------------------------------------------------------
 
 
@@ -607,8 +668,151 @@ def create_app() -> FastAPI:
                 status_code=503, detail="Database temporarily unavailable"
             ) from exc
 
+    # Friends ---------------------------------------------------------------
+
+    @app.get(
+        "/api/friend",
+        response_model=FriendOverviewResponse,
+        tags=["friend"],
+    )
+    def get_friend_overview(
+        user_id: int = Query(..., description="User identifier"),
+        session: Session = Depends(db.get_session),
+    ) -> FriendOverviewResponse:
+        try:
+            overview = db.fetch_friend_overview(session, user_id)
+        except SQLAlchemyError as exc:  # pragma: no cover - defensive
+            raise HTTPException(
+                status_code=503, detail="Database temporarily unavailable"
+            ) from exc
+
+        def _build(items: list[db.FriendUserData]) -> list[FriendUserDetailResponse]:
+            return [
+                FriendUserDetailResponse(
+                    user_id=item.user_id,
+                    account_id=item.account_id,
+                    display_name=item.display_name,
+                    icon_asset_url=item.icon_asset_url,
+                    updated_at=item.updated_at,
+                )
+                for item in items
+            ]
+
+        return FriendOverviewResponse(
+            friend=_build(overview.friend),
+            friend_requested=_build(overview.friend_requested),
+            friend_recommended=_build(overview.friend_recommended),
+            friend_requesting=_build(overview.friend_requesting),
+            friend_blocked=_build(overview.friend_blocked),
+        )
+
+    @app.get(
+        "/api/friend/search",
+        response_model=list[FriendSearchResponse],
+        tags=["friend"],
+    )
+    def search_friend(
+        input_text: str = Query(..., description="Search keyword"),
+        session: Session = Depends(db.get_session),
+    ) -> list[FriendSearchResponse]:
+        try:
+            results = db.search_users(session, input_text=input_text)
+        except SQLAlchemyError as exc:  # pragma: no cover - defensive
+            raise HTTPException(
+                status_code=503, detail="Database temporarily unavailable"
+            ) from exc
+
+        return [
+            FriendSearchResponse(
+                user_id=item.user_id,
+                account_id=item.account_id,
+                display_name=item.display_name,
+                icon_asset_url=item.icon_asset_url,
+            )
+            for item in results
+        ]
+
+    @app.put(
+        "/api/friend/request",
+        status_code=status.HTTP_204_NO_CONTENT,
+        tags=["friend"],
+    )
+    def update_friend(
+        payload: FriendRequestUpdateRequest,
+        session: Session = Depends(db.get_session),
+    ) -> None:
+        try:
+            db.update_friend_request(
+                session,
+                user_id=payload.user_id,
+                friend_user_id=payload.friend_user_id,
+                updated_status=payload.updated_status,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except SQLAlchemyError as exc:  # pragma: no cover - defensive
+            raise HTTPException(
+                status_code=503, detail="Database temporarily unavailable"
+            ) from exc
+
+    # Users -----------------------------------------------------------------
+
+    @app.post(
+        "/api/user/create",
+        status_code=status.HTTP_201_CREATED,
+        tags=["user"],
+    )
+    def create_user(
+        payload: UserCreateRequest,
+        session: Session = Depends(db.get_session),
+    ) -> dict[str, int]:
+        try:
+            user_id = db.upsert_user(
+                session,
+                account_id=payload.account_id,
+                display_name=payload.display_name,
+                icon_image=payload.icon_image,
+                face_image=payload.face_image,
+                profile_text=payload.profile_text,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except SQLAlchemyError as exc:  # pragma: no cover - defensive
+            raise HTTPException(
+                status_code=503, detail="Database temporarily unavailable"
+            ) from exc
+
+        return {"user_id": user_id}
+
+    @app.put(
+        "/api/user",
+        status_code=status.HTTP_204_NO_CONTENT,
+        tags=["user"],
+    )
+    def update_user(
+        payload: UserUpdateRequest,
+        session: Session = Depends(db.get_session),
+    ) -> None:
+        try:
+            db.update_user_profile(
+                session,
+                user_id=payload.user_id,
+                account_id=payload.account_id,
+                display_name=payload.display_name,
+                icon_image=payload.icon_image,
+                face_image=payload.face_image,
+                profile_text=payload.profile_text,
+            )
+        except ValueError as exc:
+            message = str(exc)
+            status_code = 404 if "not found" in message.lower() else 400
+            raise HTTPException(status_code=status_code, detail=message) from exc
+        except SQLAlchemyError as exc:  # pragma: no cover - defensive
+            raise HTTPException(
+                status_code=503, detail="Database temporarily unavailable"
+            ) from exc
+
     return app
 
 
 app = create_app()
-
