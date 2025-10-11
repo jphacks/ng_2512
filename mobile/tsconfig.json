@@ -11,7 +11,10 @@
   },
   "include": [
     "App.tsx",
+    "app",
     "src",
-    "__tests__"
+    "__tests__",
+    "tests",
+    "playwright.config.ts"
   ]
 }

@@ -44,9 +44,11 @@
   - Webサーバ: Playwright `webServer`（`npx expo start --web`）
   - テスト: `mobile/tests/e2e/*`
   - バックエンド: `docker-compose.ci.yml` + `deploy/docker-compose.mobile-e2e.yml` で `8000` 公開
-- 依存: CI.2（compose統合スタック）, CI.3（Actions運用）
-- 成果物: Playwright HTML レポート（artifact: `mobile/playwright-report`）
- - Secrets: `.env` を GitHub Secrets `MOBILE_E2E_DOTENV` に保存しておくと、ワークフローが優先して使用します（無い場合は `.env.sample` / `.env.example` をコピー）。
+  - 環境テンプレ: `deploy/.env.mobile-e2e.example`
+  - Playwright 設定: `mobile/playwright.config.ts`（レポート: `mobile/playwright-report`）
+  - 依存: CI.2（compose統合スタック）, CI.3（Actions運用）
+  - 成果物: Playwright HTML レポート（artifact: `mobile/playwright-report`）
+   - Secrets: `.env` を GitHub Secrets `MOBILE_E2E_DOTENV` に保存しておくと、ワークフローが優先して使用します（無い場合は `.env.sample` / `.env.example` をコピー）。
 
 ## CI.7 docker-compose.mobile（Expo + Firebase エミュレータ）
 - 目的: Expo クライアントと Firebase エミュレータを Docker Compose で起動し、RN 開発/テストの共通ベースを提供する。
