@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
+import secrets
+from pathlib import Path
 from typing import Iterable, Iterator, List, Sequence
 
 from sqlalchemy import (
@@ -20,6 +23,8 @@ from sqlalchemy import (
     or_,
     select,
 )
+from sqlalchemy.engine import make_url
+from sqlalchemy import inspect
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 
 from .config import DATABASE_ECHO, DATABASE_URL
@@ -29,8 +34,71 @@ class Base(DeclarativeBase):
     """Base class for ORM models."""
 
 
-engine = create_engine(DATABASE_URL, echo=DATABASE_ECHO, future=True)
-SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+def _create_engine(url: str):
+    url_obj = make_url(url)
+    engine_kwargs = {"echo": DATABASE_ECHO, "future": True}
+    if url_obj.get_backend_name() == "sqlite":
+        database_path = url_obj.database or ""
+        if database_path and database_path != ":memory:":
+            db_file = Path(database_path)
+            db_file.parent.mkdir(parents=True, exist_ok=True)
+            if os.getenv("BACKEND_TEST_USE_REAL_DB", "").lower() in {
+                "1",
+                "true",
+                "yes",
+                "on",
+            }:
+                db_file.unlink(missing_ok=True)
+    elif url_obj.get_backend_name() == "mysql" and url_obj.drivername.endswith(
+        "+pymysql"
+    ):
+        connect_args = dict(engine_kwargs.get("connect_args") or {})
+        ssl_args = dict(connect_args.get("ssl") or {})
+        ssl_args.setdefault("ssl", {})
+        connect_args["ssl"] = ssl_args
+        engine_kwargs["connect_args"] = connect_args
+    return create_engine(url, **engine_kwargs)
+
+
+engine = _create_engine(DATABASE_URL)
+_SQLITE_TEST_RESET = engine.url.get_backend_name() == "sqlite" and os.getenv(
+    "BACKEND_TEST_USE_REAL_DB", ""
+).lower() in {"1", "true", "yes", "on"}
+
+try:
+    ALBUM_PHOTOS_AVAILABLE = inspect(engine).has_table("album_photos")
+except Exception:  # pragma: no cover - inspector may fail during init
+    ALBUM_PHOTOS_AVAILABLE = False
+
+
+class _ResettingSession(Session):
+    """Session subclass that resets SQLite state between tests."""
+
+    _needs_reset = True
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if _SQLITE_TEST_RESET and _ResettingSession._needs_reset:
+            bind = self.get_bind()
+            if bind is not None:
+                Base.metadata.drop_all(bind=bind)
+                Base.metadata.create_all(bind=bind)
+            _ResettingSession._needs_reset = False
+
+    def close(self):
+        try:
+            super().close()
+        finally:
+            if _SQLITE_TEST_RESET:
+                _ResettingSession._needs_reset = True
+
+
+SessionLocal = sessionmaker(
+    bind=engine,
+    class_=_ResettingSession,
+    autoflush=False,
+    expire_on_commit=False,
+)
 
 
 # --- ORM table definitions -------------------------------------------------
@@ -71,8 +139,7 @@ class UserFriendship(Base):
     user_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     friend_user_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     status: Mapped[str] = mapped_column(String(length=32))
-    requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    responded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
 class ChatGroup(Base):
@@ -95,7 +162,7 @@ class ChatMember(Base):
         ForeignKey("chat_groupes.id"), primary_key=True
     )
     user_id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    last_viewed_message_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    last_viewed_message_id: Mapped[int] = mapped_column(Integer)
 
 
 class ChatMessage(Base):
@@ -117,8 +184,12 @@ class User(Base):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    display_name: Mapped[str | None] = mapped_column(String, nullable=True)
-    icon_asset_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    assets_id: Mapped[str] = mapped_column(String(length=128))
+    account_id: Mapped[str] = mapped_column(String(length=128))
+    display_name: Mapped[str] = mapped_column(String(length=255))
+    icon_asset_url: Mapped[str | None] = mapped_column(String(length=2048), nullable=True)
+    face_asset_url: Mapped[str | None] = mapped_column(String(length=2048), nullable=True)
+    profile_text: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class Asset(Base):
@@ -127,7 +198,10 @@ class Asset(Base):
     __tablename__ = "assets"
 
     id: Mapped[str] = mapped_column(primary_key=True)
-    storage_key: Mapped[str | None] = mapped_column(String, nullable=True)
+    owner_id: Mapped[int] = mapped_column(Integer)
+    content_type: Mapped[str] = mapped_column(String(length=255))
+    storage_key: Mapped[str] = mapped_column(String(length=1024))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
 class Album(Base):
@@ -148,6 +222,7 @@ class AlbumSharedUser(Base):
 
     album_id: Mapped[int] = mapped_column(ForeignKey("albums.id"), primary_key=True)
     user_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    role: Mapped[str | None] = mapped_column(String(length=64), nullable=True)
     added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
@@ -156,9 +231,9 @@ class AlbumPhoto(Base):
 
     __tablename__ = "album_photos"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    album_id: Mapped[int] = mapped_column(ForeignKey("albums.id"))
-    photo_url: Mapped[str] = mapped_column(String)
+    album_id: Mapped[int] = mapped_column(ForeignKey("albums.id"), primary_key=True)
+    photo_url: Mapped[str] = mapped_column(String(length=512), primary_key=True)
+    id: Mapped[int] = mapped_column(Integer, nullable=False)
     captured_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
@@ -169,11 +244,19 @@ class VLMObservation(Base):
     __tablename__ = "vlm_observations"
 
     observation_id: Mapped[str] = mapped_column(String, primary_key=True)
+    asset_id: Mapped[str | None] = mapped_column(String(length=64), nullable=True)
+    observation_hash: Mapped[str] = mapped_column(String(length=255))
+    model_version: Mapped[str] = mapped_column(String(length=255))
+    prompt_payload: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     initiator_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     schedule_candidates: Mapped[dict | list | None] = mapped_column(JSON, nullable=True)
     member_candidates: Mapped[dict | list | None] = mapped_column(JSON, nullable=True)
+    notes: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     extra_metadata: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    processed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
 # --- Data transfer helpers -------------------------------------------------
@@ -299,7 +382,7 @@ def count_pending_friend_requests(session: Session, user_id: int) -> int:
         select(func.count())
         .select_from(UserFriendship)
         .where(UserFriendship.friend_user_id == user_id)
-        .where(UserFriendship.status == "pending")
+        .where(UserFriendship.status == "requested")
     )
     return session.scalar(stmt) or 0
 
@@ -341,16 +424,15 @@ def fetch_active_proposals(session: Session, user_id: int) -> list[ProposalData]
     ).subquery()
 
     rows = session.execute(
-        select(Proposal, ProposalParticipant, User, Asset)
+        select(Proposal, ProposalParticipant, User)
         .join(ProposalParticipant, Proposal.id == ProposalParticipant.proposal_id)
         .join(User, ProposalParticipant.user_id == User.id)
-        .outerjoin(Asset, User.icon_asset_id == Asset.id)
         .where(Proposal.id.in_(select(eligible_proposals.c.id)))
         .order_by(Proposal.created_at.desc(), ProposalParticipant.user_id.asc())
     ).all()
 
     proposals: dict[int, ProposalData] = {}
-    for proposal_obj, participant_obj, user_obj, asset_obj in rows:
+    for proposal_obj, participant_obj, user_obj in rows:
         data = proposals.get(proposal_obj.id)
         if data is None:
             data = ProposalData(
@@ -369,7 +451,7 @@ def fetch_active_proposals(session: Session, user_id: int) -> list[ProposalData]
                 user_id=user_obj.id,
                 status=participant_obj.status,
                 display_name=user_obj.display_name or "",
-                icon_asset_url=(asset_obj.storage_key if asset_obj else None),
+                icon_asset_url=getattr(user_obj, "icon_asset_url", None),
             )
         )
 
@@ -504,7 +586,7 @@ def fetch_chat_groups(session: Session, user_id: int) -> list[ChatGroupSummary]:
         last_message = session.execute(
             select(ChatMessage)
             .where(ChatMessage.chat_id == group.id)
-            .order_by(ChatMessage.posted_at.desc())
+            .order_by(ChatMessage.id.desc())
             .limit(1)
         ).scalar_one_or_none()
 
@@ -571,7 +653,7 @@ def create_chat_group(
             ChatMember(
                 chat_groupe_id=group.id,
                 user_id=member_id,
-                last_viewed_message_id=None,
+                last_viewed_message_id=0,
             )
         )
         inserted_members.add(member_id)
@@ -589,9 +671,8 @@ def fetch_chat_messages(
 ) -> list[ChatMessageData]:
     """Return chat messages ordered from newest to oldest."""
     stmt = (
-        select(ChatMessage, User, Asset)
+        select(ChatMessage, User)
         .join(User, ChatMessage.sender_id == User.id)
-        .outerjoin(Asset, User.icon_asset_id == Asset.id)
         .where(ChatMessage.chat_id == chat_id)
     )
     if oldest_chat_id is not None:
@@ -602,14 +683,14 @@ def fetch_chat_messages(
     ).all()
 
     messages: list[ChatMessageData] = []
-    for message, user_obj, asset_obj in rows:
+    for message, user_obj in rows:
         messages.append(
             ChatMessageData(
                 id=message.id,
                 chat_id=message.chat_id,
                 sender_id=message.sender_id,
                 sender_name=user_obj.display_name or "",
-                sender_icon_url=(asset_obj.storage_key if asset_obj else None),
+                sender_icon_url=getattr(user_obj, "icon_asset_url", None),
                 body=message.body,
                 image_url=message.image_url,
                 posted_at=message.posted_at,
@@ -646,7 +727,6 @@ def create_chat_messages(
         session.flush()
 
         user_obj = session.get(User, sender_id)
-        asset_obj = session.get(Asset, user_obj.icon_asset_id) if user_obj and user_obj.icon_asset_id else None
 
         created.append(
             ChatMessageData(
@@ -654,7 +734,7 @@ def create_chat_messages(
                 chat_id=message.chat_id,
                 sender_id=message.sender_id,
                 sender_name=user_obj.display_name if user_obj else "",
-                sender_icon_url=asset_obj.storage_key if asset_obj else None,
+                sender_icon_url=getattr(user_obj, "icon_asset_url", None) if user_obj else None,
                 body=message.body,
                 image_url=message.image_url,
                 posted_at=message.posted_at,
@@ -669,7 +749,7 @@ def create_chat_messages(
                 ChatMember(
                     chat_groupe_id=chat_id,
                     user_id=sender_id,
-                    last_viewed_message_id=last_message_id,
+                    last_viewed_message_id=last_message_id or 0,
                 )
             )
         else:
@@ -687,13 +767,26 @@ def add_chat_member(session: Session, chat_id: int, user_id: int) -> None:
             ChatMember(
                 chat_groupe_id=chat_id,
                 user_id=user_id,
-                last_viewed_message_id=None,
+                last_viewed_message_id=0,
             )
         )
         session.commit()
 
 
 # --- Album queries ---------------------------------------------------------
+
+
+def _assert_album_support() -> None:
+    if not ALBUM_PHOTOS_AVAILABLE:
+        raise RuntimeError("Album photo support is not available on this database.")
+
+
+def _generate_album_photo_id() -> int:
+    """Return a positive pseudo-random identifier suitable for BIGINT columns."""
+    value = secrets.randbits(63)
+    while value == 0:
+        value = secrets.randbits(63)
+    return value
 
 
 def fetch_albums(
@@ -704,6 +797,7 @@ def fetch_albums(
     limit: int = 10,
 ) -> list[AlbumSummary]:
     """Return accessible albums for the user."""
+    _assert_album_support()
     albums_stmt = (
         select(Album)
         .outerjoin(AlbumSharedUser, Album.id == AlbumSharedUser.album_id)
@@ -753,6 +847,7 @@ def fetch_albums(
 
 def create_album(session: Session, *, user_id: int, title: str) -> int:
     """Create an album and return its identifier."""
+    _assert_album_support()
     now = datetime.now(timezone.utc)
     album = Album(title=title, creator_id=user_id, created_at=now)
     session.add(album)
@@ -762,6 +857,7 @@ def create_album(session: Session, *, user_id: int, title: str) -> int:
         AlbumSharedUser(
             album_id=album.id,
             user_id=user_id,
+            role="owner",
             added_at=now,
         )
     )
@@ -778,6 +874,7 @@ def fetch_album_photos(
     limit: int = 30,
 ) -> tuple[bool, list[AlbumPhotoData]]:
     """Return album photos with newest first along with ownership."""
+    _assert_album_support()
     album = session.get(Album, album_id)
     if album is None:
         raise ValueError("Album not found.")
@@ -809,10 +906,12 @@ def add_album_photos(
     photo_urls: Sequence[str],
 ) -> list[AlbumPhotoData]:
     """Insert new album photos and return their metadata."""
+    _assert_album_support()
     now = datetime.now(timezone.utc)
     created: list[AlbumPhotoData] = []
     for url in photo_urls:
         photo = AlbumPhoto(
+            id=_generate_album_photo_id(),
             album_id=album_id,
             photo_url=url,
             captured_at=None,
@@ -840,6 +939,7 @@ def update_album(
     shared_user_ids: Sequence[int],
 ) -> None:
     """Update album metadata and membership."""
+    _assert_album_support()
     album = session.get(Album, album_id)
     if album is None:
         raise ValueError("Album not found.")
@@ -862,6 +962,7 @@ def update_album(
             AlbumSharedUser(
                 album_id=album_id,
                 user_id=user_id,
+                role="viewer",
                 added_at=now,
             )
         )
@@ -876,3 +977,15 @@ def update_album(
         )
 
     session.commit()
+
+
+def _initialize_sqlite_schema() -> None:
+    """Ensure SQLite databases used in tests have the expected schema."""
+    if engine.url.get_backend_name() != "sqlite":
+        return
+    Base.metadata.create_all(bind=engine)
+    global ALBUM_PHOTOS_AVAILABLE
+    ALBUM_PHOTOS_AVAILABLE = True
+
+
+_initialize_sqlite_schema()
