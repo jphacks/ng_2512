@@ -11,14 +11,15 @@
 
 ### users
 
-| 列            | 型     | 制約・補足                                                                           |
-| ------------- | ------ | ------------------------------------------------------------------------------------ |
-| id            | BIGINT | 主キー（オートインクリメント）。                                                     |
-| account_id    | TEXT   | 必須。アカウントを一意に識別する ID。                                                |
-| display_name  | TEXT   | 必須。ユーザー表示名。                                                               |
-| icon_asset_id | TEXT   | 任意。プロフィールアイコン画像の `assets.id` を参照（`ON DELETE SET NULL` を想定）。 |
-| face_asset_id | TEXT   | 任意。本人顔写真の `assets.id` を参照（`ON DELETE SET NULL` を想定）。               |
-| profile_text  | TEXT   | 任意。プロフィール文章。                                                             |
+| 列             | 型     | 制約・補足                             |
+| -------------- | ------ | -------------------------------------- |
+| id             | BIGINT | 主キー（オートインクリメント）。       |
+| assets_id      | TEXT   | 必須。`assets.id` への外部キー。       |
+| account_id     | TEXT   | 必須。アカウントを一意に識別する ID。  |
+| display_name   | TEXT   | 必須。ユーザー表示名。                 |
+| icon_asset_url | TEXT   | 任意。プロフィールアイコン画像の URL。 |
+| face_asset_url | TEXT   | 任意。本人顔写真の URL。               |
+| profile_text   | TEXT   | 任意。プロフィール文章。               |
 
 - リレーション: `icon_asset_id` と `face_asset_id` を通じて `assets` を参照し、ユーザーの画像資産を紐付ける。
 
@@ -119,6 +120,7 @@
 | 列          | 型          | 制約・補足                                     |
 | ----------- | ----------- | ---------------------------------------------- |
 | id          | BIGSERIAL   | 主キー。                                       |
+| title       | TEXT        | 必須。提案のタイトル。                         |
 | event_date  | DATE        | 必須。提案の開催予定日。                       |
 | location    | TEXT        | 任意。イベント予定地のテキスト表現。           |
 | creator_id  | BIGINT      | 必須。提案を作成した `users.id` への外部キー。 |
@@ -129,12 +131,12 @@
 
 ### proposal_participants
 
-| 列          | 型          | 制約・補足                                                                                                                 |
-| ----------- | ----------- | -------------------------------------------------------------------------------------------------------------------------- |
-| proposal_id | BIGINT      | 複合主キーの一部。`proposals.id` への外部キー（`ON DELETE CASCADE`）。                                                     |
-| user_id     | BIGINT      | 複合主キーの一部。`users.id` への外部キー（`ON DELETE CASCADE`）。                                                         |
-| status      | TEXT        | 必須。提案参加の状態を表す列挙（例: `'invited'`, `'accepted'`, `'declined'`）。アプリ側で ENUM を定義し 3 状態を強制する。 |
-| updated_at  | TIMESTAMPTZ | 既定値 `now()`。状態更新日時。                                                                                             |
+| 列          | 型          | 制約・補足                                                                                                                       |
+| ----------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| proposal_id | BIGINT      | 複合主キーの一部。`proposals.id` への外部キー（`ON DELETE CASCADE`）。                                                           |
+| user_id     | BIGINT      | 複合主キーの一部。`users.id` への外部キー（`ON DELETE CASCADE`）。                                                               |
+| status      | ENUM        | 必須。提案参加の状態を表す列挙（例: `0:'invited'`, `1:'accepted'`, `2:'declined'`）。アプリ側で ENUM を定義し 3 状態を強制する。 |
+| updated_at  | TIMESTAMPTZ | 既定値 `now()`。状態更新日時。                                                                                                   |
 
 - 制約: `(proposal_id, user_id)` の複合主キーで重複登録を防ぎ、`status` 列はアプリケーションまたは DB の ENUM 型で 3 値に限定する。
 
@@ -145,8 +147,8 @@
 | user_id        | BIGINT      | 複合主キーの一部。`users.id` への外部キー（`ON DELETE CASCADE`）。                                                                                                                          |
 | friend_user_id | BIGINT      | 複合主キーの一部。`users.id` への外部キー（`ON DELETE CASCADE`）。                                                                                                                          |
 | status         | TEXT        | 必須。フレンド状態を表す ENUM（`'none'`〔既定値: 関係なし〕、`'recommended'`〔AI による候補提示〕、`'requested'`〔申請待ち〕、`'accepted'`〔フレンド確定〕、`'blocked'`〔ブロック済み〕）。 |
-| requested_at   | TIMESTAMPTZ | 既定値 `now()` 。フレンド申請日時。                                                                                                                                                         |
-| responded_at   | TIMESTAMPTZ | 任意。申請が承認／拒否された日時。                                                                                                                                                          |
+| updated_at     | TIMESTAMPTZ | 既定値 `now()`。状態更新日時。                                                                                                                                                              |
+|                |
 
 - 制約: `(user_id, friend_user_id)` の複合主キーで同一方向の重複を防ぎつつ、`user_id != friend_user_id` をチェック制約で保証する。`status` は DB の ENUM 型または CHECK 制約で定義し、AI 推薦状態（`'recommended'`）を含む 5 状態をアプリケーション側と同期させる。
 - 運用: A→B と B→A のレコードを別々に保持できる（双方向で同一状態を維持したい場合はアプリ側またはトリガーで同期させる）。
@@ -177,6 +179,7 @@
 
 | 列          | 型          | 制約・補足                                                          |
 | ----------- | ----------- | ------------------------------------------------------------------- |
+| id          | BIGINT      | 主キー。                                                            |
 | album_id    | BIGINT      | 複合主キーの一部。`albums.id` への外部キー（`ON DELETE CASCADE`）。 |
 | photo_url   | TEXT        | 複合主キーの一部。アルバム内で一意となる写真 URL。                  |
 | captured_at | TIMESTAMPTZ | 任意。撮影日時。                                                    |
@@ -184,6 +187,17 @@
 
 - 制約: `(album_id, photo_url)` の複合主キーで同一写真の重複登録を防止。`captured_at` が不明な場合でも `uploaded_at` で時系列管理可能。
 - 運用: 写真の実体は `assets` やオブジェクトストレージに保存し、このテーブルではアルバムとの紐付けとメタデータのみを保持する。
+
+### chat_groupes
+
+| 列         | 型          | 制約・補足                                |
+| ---------- | ----------- | ----------------------------------------- |
+| id         | BIGSERIAL   | 主キー。チャットルームを識別する ID。     |
+| title      | TEXT        | 必須。チャットのタイトル。                |
+| icon_url   | TEXT        | 任意。チャットのアイコン画像 URL。        |
+| created_at | TIMESTAMPTZ | 既定値 `now()` 。チャットルーム作成日時。 |
+
+- リレーション: チャット参加ユーザーを管理する場合は別テーブル（例: `chat_member_users`）で `id` を外部キーとして参照させる。
 
 ### chat_members
 
