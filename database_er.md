@@ -12,6 +12,7 @@ erDiagram
     USERS ||--o{ ALBUMS : "creates"
     USERS ||--o{ ALBUM_SHARED_USERS : "shares"
     USERS ||--o{ CHAT_MESSAGES : "sends"
+    USERS ||--o{ CHAT_MEMBERS: "contain"
     USERS ||--o{ THEME_SUGGESTIONS : "requests"
     USERS ||--o{ VLM_OBSERVATIONS : "initiates"
 
@@ -34,7 +35,9 @@ erDiagram
     %% Albums and chat
     ALBUMS ||--o{ ALBUM_SHARED_USERS : "shared with"
     ALBUMS ||--o{ ALBUM_PHOTOS : "contains"
-    CHAT_MEMBERS ||--o{ CHAT_MESSAGES : "receives"
+    CHAT_GPOUPS ||--o{ CHAT_MESSAGES : "receives"
+    CHAT_GPOUPS ||--o{ CHAT_MEMBERS : "receives"
+    CHAT_MEMBERS ||--o| CHAT_MESSAGES : "has"
 
     %% Vision-Language pipelines
     VLM_OBSERVATIONS ||--o{ VLM_DETECTION_ENTITIES : "produces"
@@ -43,9 +46,10 @@ erDiagram
         id int PK
         account_id string
         display_name string
-        icon_asset_id string
-        face_asset_id string
+        icon_asset_url string
+        face_asset_url string
         profile_text string
+        created_at datetime
     }
 
     ASSETS {
@@ -111,60 +115,66 @@ erDiagram
 
     PROPOSALS {
         id int PK
+        title string
         event_date date
         location string
-        creator_id int
+        creator_id int FK
         created_at datetime
         deadline_at datetime
     }
 
     PROPOSAL_PARTICIPANTS {
-        proposal_id int PK
-        user_id int PK
-        status string
+        proposal_id int PKFK
+        user_id int PKFK
+        status enum
         updated_at datetime
     }
 
     USER_FRIENDSHIPS {
-        user_id int PK
-        friend_user_id int PK
-        status string
-        requested_at datetime
-        responded_at datetime
+        user_id int PKFK
+        friend_user_id int RKFK
+        status enum
+        updated_at datetime
     }
 
     ALBUMS {
         id int PK
         title string
-        creator_id int
+        creator_id int FK
         created_at datetime
     }
 
     ALBUM_SHARED_USERS {
-        album_id int PK
-        user_id int PK
-        role string
+        album_id int PKFK
+        user_id int PKFK
         added_at datetime
     }
 
     ALBUM_PHOTOS {
-        album_id int PK
-        photo_url string PK
+        id int PK
+        album_id int FK
+        photo_url string
         captured_at datetime
         uploaded_at datetime
     }
 
-    CHAT_MEMBERS {
+    CHAT_GPOUPS {
         id int PK
         title string
         icon_url string
         created_at datetime
     }
 
+    CHAT_MEMBERS {
+        chat_id int PKFK
+        user_id int PKFK
+        last_view_messate int_FK
+    }
+
     CHAT_MESSAGES {
         id int PK
-        chat_id int
-        sender_id int
+        chat_id int FK
+        sender_id int FK
         body string
         image_url string
         posted_at datetime
