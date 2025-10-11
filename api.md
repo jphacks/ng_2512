@@ -33,6 +33,7 @@ GET
         participants: [
             {
                 user_id: int,
+                account_id: string,
                 status: enum,
                 display_name: string,
                 icon_asset_url: string
@@ -239,3 +240,128 @@ UPDATE
 ```
 
 ## フレンド
+
+```
+GET
+/api/friend
+{
+    user_id: int,
+},
+{
+    friend: [
+        {
+            user_id: int,
+            account_id: string,
+            display_name: string,
+            icon_asset_url: string,
+            updated_at: datetime
+        },
+        ...
+    ],
+    friend_requested: [
+        {
+            user_id: int,
+            account_id: string,
+            display_name: string,
+            icon_asset_url: string,
+            updated_at: datetime
+        },
+        ...
+    ],
+    friend_recommended: [
+        {
+            user_id: int,
+            account_id: string,
+            display_name: string,
+            icon_asset_url: string,
+            updated_at: datetime
+        },
+        ...
+    ],
+    friend_requesting: [
+        {
+            user_id: int,
+            account_id: string,
+            display_name: string,
+            icon_asset_url: string,
+            updated_at: datetime
+        },
+        ...
+    ],
+    friend_blocked: [
+        {
+            user_id: int,
+            account_id: string,
+            display_name: string,
+            icon_asset_url: string,
+            updated_at: datetime
+        },
+        ...
+    ]
+}
+各種フレンド情報をまとめて取得
+```
+
+```
+GET
+/api/friend/search
+{
+    input_text: string
+},
+[
+    {
+        user_id: int,
+        account_id: string,
+        display_name: string,
+        icon_asset_url: string
+    },
+    ...
+]
+新しいアルバムが上に来るように。
+oldest_albam_id以前のチャットを10件ずつ取得。
+```
+
+```
+UPDATE
+/api/friend/request
+{
+    user_id: int,
+    friend_user_id: int,
+    updated_status: enum
+}
+```
+
+## 設定
+
+```
+POST
+/api/user/create
+{
+    account_id: string,
+    display_name: string,
+    icon_image: binary/null,
+    face_image: binary,
+    profile_text: string/null
+},
+{
+    user_id: int
+}
+認証の代わりにユーザーを登録する仮のエンドポイント
+同じaccoun_idがDBに存在していたらデータを上書き
+```
+
+```
+UPDATE
+/api/user
+{
+    user_id: int,
+    account_id: string,
+    display_name: string,
+    icon_image: binary/null,
+    face_image: binary/null,
+    profile_text: string/null
+},
+{
+    とくになし
+}
+```
