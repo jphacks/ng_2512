@@ -25,3 +25,4 @@ docker run --rm -p 8000:8000 recall-backend:prod
 - `tests/` 配下に pytest スモークテストがあり、テストターゲットで自動実行されます。
 - 依存インストールは wheel を事前構築してキャッシュし、テスト/プロダクションで再利用します。
 - `scripts/wait_for_dependencies.py` は docker-compose.test から依存サービスの待機に利用しています。
+- `docker-compose.test.yml` は `.env.test` から DB/Redis/vLLM の接続情報を読み込みます。
