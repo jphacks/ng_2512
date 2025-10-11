@@ -1,15 +1,15 @@
 import React, { useState } from "react";
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  ScrollView, 
-  TouchableOpacity, 
-  Switch, 
-  Image, 
-  Modal, 
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Switch,
+  Image,
+  Modal,
   TextInput,
-  Alert
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useColorScheme } from "@/hooks/use-color-scheme";
@@ -33,20 +33,25 @@ export default function SettingsScreen() {
   });
 
   const handleLogout = () => {
-    Alert.alert(
-      "ログアウト",
-      "本当にログアウトしますか？",
-      [
-        { text: "キャンセル", style: "cancel" },
-        { text: "ログアウト", style: "destructive", onPress: () => {
+    Alert.alert("ログアウト", "本当にログアウトしますか？", [
+      { text: "キャンセル", style: "cancel" },
+      {
+        text: "ログアウト",
+        style: "destructive",
+        onPress: () => {
           // ログアウト処理を実装
           console.log("ログアウトしました");
-        }},
-      ]
-    );
+        },
+      },
+    ]);
   };
 
-  const NotificationToggle = ({ label, description, value, onValueChange }: {
+  const NotificationToggle = ({
+    label,
+    description,
+    value,
+    onValueChange,
+  }: {
     label: string;
     description: string;
     value: boolean;
@@ -54,23 +59,31 @@ export default function SettingsScreen() {
   }) => (
     <View style={styles.notificationItem}>
       <View style={styles.notificationContent}>
-        <Text style={[styles.notificationLabel, { color: Colors[colorScheme ?? 'light'].text }]}>
+        <Text
+          style={[
+            styles.notificationLabel,
+            { color: Colors[colorScheme ?? "light"].text },
+          ]}
+        >
           {label}
         </Text>
-        <Text style={styles.notificationDescription}>
-          {description}
-        </Text>
+        <Text style={styles.notificationDescription}>{description}</Text>
       </View>
       <Switch
         value={value}
         onValueChange={onValueChange}
-        trackColor={{ false: '#f4f3f4', true: '#2b7fff' }}
-        thumbColor={value ? '#ffffff' : '#ffffff'}
+        trackColor={{ false: "#f4f3f4", true: "#2b7fff" }}
+        thumbColor={value ? "#ffffff" : "#ffffff"}
       />
     </View>
   );
 
-  const SettingsButton = ({ icon, title, onPress, style }: {
+  const SettingsButton = ({
+    icon,
+    title,
+    onPress,
+    style,
+  }: {
     icon: any;
     title: string;
     onPress: () => void;
@@ -79,34 +92,68 @@ export default function SettingsScreen() {
     <TouchableOpacity style={[styles.settingsButton, style]} onPress={onPress}>
       <View style={styles.buttonContent}>
         <View style={[styles.iconContainer, style?.iconContainer]}>
-          <IconSymbol name={icon as any} size={20} color={style?.iconColor || Colors[colorScheme ?? 'light'].text} />
+          <IconSymbol
+            name={icon as any}
+            size={20}
+            color={style?.iconColor || Colors[colorScheme ?? "light"].text}
+          />
         </View>
-        <Text style={[styles.buttonText, { color: Colors[colorScheme ?? 'light'].text }]}>
+        <Text
+          style={[
+            styles.buttonText,
+            { color: Colors[colorScheme ?? "light"].text },
+          ]}
+        >
           {title}
         </Text>
       </View>
-      <IconSymbol name="chevron.right" size={20} color={Colors[colorScheme ?? 'light'].icon} />
+      <IconSymbol
+        name="chevron.right"
+        size={20}
+        color={Colors[colorScheme ?? "light"].icon}
+      />
     </TouchableOpacity>
   );
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: Colors[colorScheme ?? 'light'].background }]}>
+    <SafeAreaView
+      style={[
+        styles.container,
+        { backgroundColor: Colors[colorScheme ?? "light"].background },
+      ]}
+    >
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: Colors[colorScheme ?? 'light'].background }]}>
+      <View
+        style={[
+          styles.header,
+          { backgroundColor: Colors[colorScheme ?? "light"].background },
+        ]}
+      >
         <View style={styles.headerLeft}>
-          <Text style={[styles.headerTitle, { color: Colors[colorScheme ?? 'light'].text }]}>
+          <Text
+            style={[
+              styles.headerTitle,
+              { color: Colors[colorScheme ?? "light"].text },
+            ]}
+          >
             設定
           </Text>
-          <Text style={styles.headerSubtitle}>
-            アカウントとアプリの設定
-          </Text>
+          <Text style={styles.headerSubtitle}>アカウントとアプリの設定</Text>
         </View>
         <View style={styles.headerRight}>
           <TouchableOpacity style={styles.headerButton}>
-            <IconSymbol name="bell" size={16} color={Colors[colorScheme ?? 'light'].icon} />
+            <IconSymbol
+              name="bell"
+              size={16}
+              color={Colors[colorScheme ?? "light"].icon}
+            />
           </TouchableOpacity>
           <TouchableOpacity style={styles.headerButton}>
-            <IconSymbol name="bell" size={16} color={Colors[colorScheme ?? 'light'].icon} />
+            <IconSymbol
+              name="bell"
+              size={16}
+              color={Colors[colorScheme ?? "light"].icon}
+            />
             <View style={styles.badge}>
               <Text style={styles.badgeText}>3</Text>
             </View>
@@ -114,16 +161,31 @@ export default function SettingsScreen() {
         </View>
       </View>
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.scrollView}
+        showsVerticalScrollIndicator={false}
+      >
         {/* User Profile Section */}
-        <View style={[styles.section, { backgroundColor: Colors[colorScheme ?? 'light'].background }]}>
+        <View
+          style={[
+            styles.section,
+            { backgroundColor: Colors[colorScheme ?? "light"].background },
+          ]}
+        >
           <View style={styles.profileContainer}>
-            <Image 
-              source={{ uri: "https://via.placeholder.com/64x64/cccccc/ffffff?text=User" }}
+            <Image
+              source={{
+                uri: "https://via.placeholder.com/64x64/cccccc/ffffff?text=User",
+              }}
               style={styles.avatar}
             />
             <View style={styles.profileInfo}>
-              <Text style={[styles.profileName, { color: Colors[colorScheme ?? 'light'].text }]}>
+              <Text
+                style={[
+                  styles.profileName,
+                  { color: Colors[colorScheme ?? "light"].text },
+                ]}
+              >
                 {userProfile.name}
               </Text>
               <Text style={styles.profileBio} numberOfLines={2}>
@@ -131,7 +193,7 @@ export default function SettingsScreen() {
               </Text>
             </View>
           </View>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.editButton}
             onPress={() => setShowEditModal(true)}
           >
@@ -141,8 +203,18 @@ export default function SettingsScreen() {
         </View>
 
         {/* Notification Settings */}
-        <View style={[styles.section, { backgroundColor: Colors[colorScheme ?? 'light'].background }]}>
-          <Text style={[styles.sectionTitle, { color: Colors[colorScheme ?? 'light'].text }]}>
+        <View
+          style={[
+            styles.section,
+            { backgroundColor: Colors[colorScheme ?? "light"].background },
+          ]}
+        >
+          <Text
+            style={[
+              styles.sectionTitle,
+              { color: Colors[colorScheme ?? "light"].text },
+            ]}
+          >
             通知設定
           </Text>
           <View style={styles.notificationContainer}>
@@ -150,59 +222,85 @@ export default function SettingsScreen() {
               label="提案の通知"
               description="新しい提案が届いたときに通知します"
               value={notifications.proposals}
-              onValueChange={(value) => setNotifications(prev => ({ ...prev, proposals: value }))}
+              onValueChange={(value) =>
+                setNotifications((prev) => ({ ...prev, proposals: value }))
+              }
             />
             <View style={styles.separator} />
             <NotificationToggle
               label="メッセージの通知"
               description="新しいメッセージが届いたときに通知します"
               value={notifications.messages}
-              onValueChange={(value) => setNotifications(prev => ({ ...prev, messages: value }))}
+              onValueChange={(value) =>
+                setNotifications((prev) => ({ ...prev, messages: value }))
+              }
             />
             <View style={styles.separator} />
             <NotificationToggle
               label="フレンド申請の通知"
               description="フレンド申請が届いたときに通知します"
               value={notifications.friendRequests}
-              onValueChange={(value) => setNotifications(prev => ({ ...prev, friendRequests: value }))}
+              onValueChange={(value) =>
+                setNotifications((prev) => ({ ...prev, friendRequests: value }))
+              }
             />
             <View style={styles.separator} />
             <NotificationToggle
               label="リマインダー"
               description="予定のリマインダーを通知します"
               value={notifications.reminders}
-              onValueChange={(value) => setNotifications(prev => ({ ...prev, reminders: value }))}
+              onValueChange={(value) =>
+                setNotifications((prev) => ({ ...prev, reminders: value }))
+              }
             />
           </View>
         </View>
 
         {/* Other Settings */}
-        <View style={[styles.section, { backgroundColor: Colors[colorScheme ?? 'light'].background }]}>
+        <View
+          style={[
+            styles.section,
+            { backgroundColor: Colors[colorScheme ?? "light"].background },
+          ]}
+        >
           <SettingsButton
             icon="bell.fill"
             title="通知履歴"
             onPress={() => console.log("通知履歴")}
-            style={{ iconContainer: { backgroundColor: '#dbeafe' }, iconColor: '#3b82f6' }}
+            style={{
+              iconContainer: { backgroundColor: "#dbeafe" },
+              iconColor: "#3b82f6",
+            }}
           />
           <View style={styles.separator} />
           <SettingsButton
             icon="shield.fill"
             title="プライバシー設定"
             onPress={() => console.log("プライバシー設定")}
-            style={{ iconContainer: { backgroundColor: '#faf5ff' }, iconColor: '#8b5cf6' }}
+            style={{
+              iconContainer: { backgroundColor: "#faf5ff" },
+              iconColor: "#8b5cf6",
+            }}
           />
           <View style={styles.separator} />
           <SettingsButton
             icon="doc.text.fill"
             title="利用規約"
             onPress={() => console.log("利用規約")}
-            style={{ iconContainer: { backgroundColor: '#f0fdf4' }, iconColor: '#22c55e' }}
+            style={{
+              iconContainer: { backgroundColor: "#f0fdf4" },
+              iconColor: "#22c55e",
+            }}
           />
         </View>
 
         {/* Logout Button */}
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <IconSymbol name="rectangle.portrait.and.arrow.right.fill" size={16} color="#e7000b" />
+          <IconSymbol
+            name="rectangle.portrait.and.arrow.right.fill"
+            size={16}
+            color="#e7000b"
+          />
           <Text style={styles.logoutText}>ログアウト</Text>
         </TouchableOpacity>
 
@@ -217,15 +315,34 @@ export default function SettingsScreen() {
         presentationStyle="pageSheet"
         onRequestClose={() => setShowEditModal(false)}
       >
-        <SafeAreaView style={[styles.modalContainer, { backgroundColor: Colors[colorScheme ?? 'light'].background }]}>
-          <View style={[styles.modalHeader, { backgroundColor: Colors[colorScheme ?? 'light'].background }]}>
-            <TouchableOpacity 
+        <SafeAreaView
+          style={[
+            styles.modalContainer,
+            { backgroundColor: Colors[colorScheme ?? "light"].background },
+          ]}
+        >
+          <View
+            style={[
+              styles.modalHeader,
+              { backgroundColor: Colors[colorScheme ?? "light"].background },
+            ]}
+          >
+            <TouchableOpacity
               style={styles.closeButton}
               onPress={() => setShowEditModal(false)}
             >
-              <IconSymbol name="xmark" size={16} color={Colors[colorScheme ?? 'light'].icon} />
+              <IconSymbol
+                name="xmark"
+                size={16}
+                color={Colors[colorScheme ?? "light"].icon}
+              />
             </TouchableOpacity>
-            <Text style={[styles.modalTitle, { color: Colors[colorScheme ?? 'light'].text }]}>
+            <Text
+              style={[
+                styles.modalTitle,
+                { color: Colors[colorScheme ?? "light"].text },
+              ]}
+            >
               ユーザー情報の編集
             </Text>
             <View style={styles.placeholder} />
@@ -234,17 +351,33 @@ export default function SettingsScreen() {
           <ScrollView style={styles.modalContent}>
             {/* Avatar Section */}
             <View style={styles.formSection}>
-              <Text style={[styles.formLabel, { color: Colors[colorScheme ?? 'light'].text }]}>
+              <Text
+                style={[
+                  styles.formLabel,
+                  { color: Colors[colorScheme ?? "light"].text },
+                ]}
+              >
                 アイコン写真
               </Text>
               <View style={styles.avatarEditContainer}>
-                <Image 
-                  source={{ uri: "https://via.placeholder.com/80x80/cccccc/ffffff?text=User" }}
+                <Image
+                  source={{
+                    uri: "https://via.placeholder.com/80x80/cccccc/ffffff?text=User",
+                  }}
                   style={styles.editAvatar}
                 />
                 <TouchableOpacity style={styles.changePhotoButton}>
-                  <IconSymbol name="photo.fill" size={16} color={Colors[colorScheme ?? 'light'].text} />
-                  <Text style={[styles.changePhotoText, { color: Colors[colorScheme ?? 'light'].text }]}>
+                  <IconSymbol
+                    name="photo.fill"
+                    size={16}
+                    color={Colors[colorScheme ?? "light"].text}
+                  />
+                  <Text
+                    style={[
+                      styles.changePhotoText,
+                      { color: Colors[colorScheme ?? "light"].text },
+                    ]}
+                  >
                     写真を変更
                   </Text>
                 </TouchableOpacity>
@@ -256,34 +389,64 @@ export default function SettingsScreen() {
 
             {/* Name Section */}
             <View style={styles.formSection}>
-              <Text style={[styles.formLabel, { color: Colors[colorScheme ?? 'light'].text }]}>
+              <Text
+                style={[
+                  styles.formLabel,
+                  { color: Colors[colorScheme ?? "light"].text },
+                ]}
+              >
                 表示名
               </Text>
               <TextInput
-                style={[styles.textInput, { 
-                  backgroundColor: Colors[colorScheme ?? 'light'].background,
-                  borderColor: Colors[colorScheme ?? 'light'].tabIconDefault,
-                  color: Colors[colorScheme ?? 'light'].text
-                }]}
+                style={[
+                  styles.textInput,
+                  {
+                    backgroundColor: Colors[colorScheme ?? "light"].background,
+                    borderColor: Colors[colorScheme ?? "light"].tabIconDefault,
+                    color: Colors[colorScheme ?? "light"].text,
+                  },
+                ]}
                 value={userProfile.name}
-                onChangeText={(text) => setUserProfile(prev => ({ ...prev, name: text }))}
+                onChangeText={(text) =>
+                  setUserProfile((prev) => ({ ...prev, name: text }))
+                }
                 placeholder="表示名を入力"
-                placeholderTextColor={Colors[colorScheme ?? 'light'].tabIconDefault}
+                placeholderTextColor={
+                  Colors[colorScheme ?? "light"].tabIconDefault
+                }
               />
             </View>
 
             {/* Face Photo Section */}
             <View style={styles.formSection}>
-              <Text style={[styles.formLabel, { color: Colors[colorScheme ?? 'light'].text }]}>
+              <Text
+                style={[
+                  styles.formLabel,
+                  { color: Colors[colorScheme ?? "light"].text },
+                ]}
+              >
                 顔写真
               </Text>
               <View style={styles.facePhotoContainer}>
                 <View style={styles.facePhotoPlaceholder}>
-                  <IconSymbol name="person.fill" size={32} color={Colors[colorScheme ?? 'light'].tabIconDefault} />
+                  <IconSymbol
+                    name="person.fill"
+                    size={32}
+                    color={Colors[colorScheme ?? "light"].tabIconDefault}
+                  />
                 </View>
                 <TouchableOpacity style={styles.uploadButton}>
-                  <IconSymbol name="square.and.arrow.up.fill" size={16} color={Colors[colorScheme ?? 'light'].text} />
-                  <Text style={[styles.uploadButtonText, { color: Colors[colorScheme ?? 'light'].text }]}>
+                  <IconSymbol
+                    name="square.and.arrow.up.fill"
+                    size={16}
+                    color={Colors[colorScheme ?? "light"].text}
+                  />
+                  <Text
+                    style={[
+                      styles.uploadButtonText,
+                      { color: Colors[colorScheme ?? "light"].text },
+                    ]}
+                  >
                     写真をアップロード
                   </Text>
                 </TouchableOpacity>
@@ -295,19 +458,31 @@ export default function SettingsScreen() {
 
             {/* Bio Section */}
             <View style={styles.formSection}>
-              <Text style={[styles.formLabel, { color: Colors[colorScheme ?? 'light'].text }]}>
+              <Text
+                style={[
+                  styles.formLabel,
+                  { color: Colors[colorScheme ?? "light"].text },
+                ]}
+              >
                 プロフィール文章
               </Text>
               <TextInput
-                style={[styles.textArea, { 
-                  backgroundColor: Colors[colorScheme ?? 'light'].background,
-                  borderColor: Colors[colorScheme ?? 'light'].tabIconDefault,
-                  color: Colors[colorScheme ?? 'light'].text
-                }]}
+                style={[
+                  styles.textArea,
+                  {
+                    backgroundColor: Colors[colorScheme ?? "light"].background,
+                    borderColor: Colors[colorScheme ?? "light"].tabIconDefault,
+                    color: Colors[colorScheme ?? "light"].text,
+                  },
+                ]}
                 value={userProfile.bio}
-                onChangeText={(text) => setUserProfile(prev => ({ ...prev, bio: text }))}
+                onChangeText={(text) =>
+                  setUserProfile((prev) => ({ ...prev, bio: text }))
+                }
                 placeholder="自己紹介を入力してください"
-                placeholderTextColor={Colors[colorScheme ?? 'light'].tabIconDefault}
+                placeholderTextColor={
+                  Colors[colorScheme ?? "light"].tabIconDefault
+                }
                 multiline
                 numberOfLines={4}
                 maxLength={200}
@@ -320,15 +495,23 @@ export default function SettingsScreen() {
 
           {/* Modal Footer */}
           <View style={styles.modalFooter}>
-            <TouchableOpacity 
-              style={[styles.cancelButton, { borderColor: Colors[colorScheme ?? 'light'].tabIconDefault }]}
+            <TouchableOpacity
+              style={[
+                styles.cancelButton,
+                { borderColor: Colors[colorScheme ?? "light"].tabIconDefault },
+              ]}
               onPress={() => setShowEditModal(false)}
             >
-              <Text style={[styles.cancelButtonText, { color: Colors[colorScheme ?? 'light'].text }]}>
+              <Text
+                style={[
+                  styles.cancelButtonText,
+                  { color: Colors[colorScheme ?? "light"].text },
+                ]}
+              >
                 キャンセル
               </Text>
             </TouchableOpacity>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.saveButton}
               onPress={() => {
                 setShowEditModal(false);
@@ -350,53 +533,53 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1.33,
-    borderBottomColor: '#e5e5e5',
+    borderBottomColor: "#e5e5e5",
   },
   headerLeft: {
     flex: 1,
   },
   headerTitle: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
     marginBottom: 4,
   },
   headerSubtitle: {
     fontSize: 14,
-    color: '#6a7282',
+    color: "#6a7282",
   },
   headerRight: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 8,
   },
   headerButton: {
     width: 36,
     height: 32,
     borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
+    justifyContent: "center",
+    alignItems: "center",
+    position: "relative",
   },
   badge: {
-    position: 'absolute',
+    position: "absolute",
     top: -4,
     right: -4,
-    backgroundColor: '#fb2c36',
+    backgroundColor: "#fb2c36",
     borderRadius: 8,
     width: 16,
     height: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   badgeText: {
-    color: 'white',
+    color: "white",
     fontSize: 12,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   scrollView: {
     flex: 1,
@@ -407,10 +590,10 @@ const styles = StyleSheet.create({
     padding: 24,
     marginTop: 16,
     borderWidth: 1.33,
-    borderColor: '#e5e5e5',
+    borderColor: "#e5e5e5",
   },
   profileContainer: {
-    flexDirection: 'row',
+    flexDirection: "row",
     marginBottom: 16,
   },
   avatar: {
@@ -421,44 +604,44 @@ const styles = StyleSheet.create({
   },
   profileInfo: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   profileName: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
     marginBottom: 4,
   },
   profileBio: {
     fontSize: 14,
-    color: '#6a7282',
+    color: "#6a7282",
     lineHeight: 20,
   },
   editButton: {
-    backgroundColor: '#2b7fff',
+    backgroundColor: "#2b7fff",
     borderRadius: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: 10,
     gap: 8,
   },
   editButtonText: {
-    color: 'white',
+    color: "white",
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   sectionTitle: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
     marginBottom: 16,
   },
   notificationContainer: {
     gap: 0,
   },
   notificationItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingVertical: 12,
   },
   notificationContent: {
@@ -467,63 +650,63 @@ const styles = StyleSheet.create({
   },
   notificationLabel: {
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: "500",
     marginBottom: 4,
   },
   notificationDescription: {
     fontSize: 14,
-    color: '#6a7282',
+    color: "#6a7282",
     lineHeight: 20,
   },
   separator: {
     height: 1,
-    backgroundColor: 'rgba(0,0,0,0.1)',
+    backgroundColor: "rgba(0,0,0,0.1)",
     marginVertical: 8,
   },
   settingsButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingVertical: 16,
   },
   buttonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     flex: 1,
   },
   iconContainer: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginRight: 12,
   },
   buttonText: {
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   logoutButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'white',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "white",
     borderRadius: 14,
     borderWidth: 1.33,
-    borderColor: '#ffc9c9',
+    borderColor: "#ffc9c9",
     paddingVertical: 10,
     marginTop: 16,
     gap: 8,
   },
   logoutText: {
-    color: '#e7000b',
+    color: "#e7000b",
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   versionText: {
-    textAlign: 'center',
+    textAlign: "center",
     fontSize: 14,
-    color: '#99a1af',
+    color: "#99a1af",
     marginTop: 20,
     marginBottom: 32,
   },
@@ -532,24 +715,24 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e5e5',
+    borderBottomColor: "#e5e5e5",
   },
   closeButton: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   placeholder: {
     width: 32,
@@ -564,12 +747,12 @@ const styles = StyleSheet.create({
   },
   formLabel: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: "500",
     marginBottom: 8,
   },
   avatarEditContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 8,
   },
   editAvatar: {
@@ -579,19 +762,19 @@ const styles = StyleSheet.create({
     marginRight: 16,
   },
   changePhotoButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'white',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "white",
     borderRadius: 16,
     borderWidth: 1.33,
-    borderColor: 'rgba(0,0,0,0.1)',
+    borderColor: "rgba(0,0,0,0.1)",
     paddingHorizontal: 12,
     paddingVertical: 8,
     gap: 8,
   },
   changePhotoText: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   textInput: {
     borderRadius: 14,
@@ -602,33 +785,33 @@ const styles = StyleSheet.create({
     minHeight: 36,
   },
   facePhotoContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 8,
   },
   facePhotoPlaceholder: {
     width: 96,
     height: 96,
     borderRadius: 16,
-    backgroundColor: '#f3f4f6',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#f3f4f6",
+    justifyContent: "center",
+    alignItems: "center",
     marginRight: 16,
   },
   uploadButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'white',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "white",
     borderRadius: 16,
     borderWidth: 1.33,
-    borderColor: 'rgba(0,0,0,0.1)',
+    borderColor: "rgba(0,0,0,0.1)",
     paddingHorizontal: 12,
     paddingVertical: 8,
     gap: 8,
   },
   uploadButtonText: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   textArea: {
     borderRadius: 14,
@@ -637,49 +820,49 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     fontSize: 16,
     minHeight: 100,
-    textAlignVertical: 'top',
+    textAlignVertical: "top",
   },
   characterCount: {
-    textAlign: 'right',
+    textAlign: "right",
     fontSize: 14,
-    color: '#6a7282',
+    color: "#6a7282",
     marginTop: 8,
   },
   formDescription: {
     fontSize: 14,
-    color: '#6a7282',
+    color: "#6a7282",
     lineHeight: 20,
   },
   modalFooter: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 12,
     paddingHorizontal: 24,
     paddingVertical: 16,
     borderTopWidth: 1,
-    borderTopColor: '#e5e5e5',
+    borderTopColor: "#e5e5e5",
   },
   cancelButton: {
     flex: 1,
-    backgroundColor: 'white',
+    backgroundColor: "white",
     borderRadius: 14,
     borderWidth: 1.33,
     paddingVertical: 9,
-    alignItems: 'center',
+    alignItems: "center",
   },
   cancelButtonText: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   saveButton: {
     flex: 1,
-    backgroundColor: '#2b7fff',
+    backgroundColor: "#2b7fff",
     borderRadius: 14,
     paddingVertical: 9,
-    alignItems: 'center',
+    alignItems: "center",
   },
   saveButtonText: {
-    color: 'white',
+    color: "white",
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: "500",
   },
 });
