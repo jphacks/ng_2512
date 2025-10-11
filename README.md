@@ -158,6 +158,23 @@ npx expo run:android
 - 補助スクリプト:
   - `python tools/taskflow.py status`
   - `python tools/taskflow.py mark <ID> <pending|in_progress|done>`
+
+## 10. AI Compute Service
+- `AI_server/` に FastAPI 製の AI コンピュートサービスを追加しました。顔画像の埋め込み生成と顔マッチング、LLM を用いた提案サジェストを提供します。
+- 主要エンドポイント:
+  - `POST /api/face_embeddings`: Hugging Face の `openai/clip-vit-base-patch32` モデルで顔埋め込みを生成（画像はファイルパス/URL/base64 データ URI をサポート）。
+  - `POST /api/face_match`: 既存ユーザー埋め込みとのコサイン類似度マッチング。
+  - `POST /api/proposals/suggest`: `gpt-oss:20b` 互換の LLM API を呼び出して提案案を JSON で返却（未設定時はフォールバック）。
+- 環境変数は `AI_server/.env` で定義できます（例: `FACE_EMBEDDING_MODEL_ID`, `LLM_API_BASE_URL`, `AI_STORAGE_ROOT`）。本番向けには `AI_server/.env.example` を参照して適宜上書きしてください。
+- ローカル実行:
+  ```
+  python3 -m venv .venv-ai
+  . .venv-ai/bin/activate
+  pip install -r AI_server/requirements.txt
+  export $(grep -v '^#' AI_server/.env | xargs)  # もしくは direnv 等
+  uvicorn AI_server.main:app --host 0.0.0.0 --port 8500
+  ```
+- Docker Compose では `ai_server` サービスとして組み込まれており、バックエンドからは `AI_COMPUTE_SERVER_URL=http://ai_server:8500` で参照されます。必要に応じて `AI_server/storage/` をマウントしてローカル画像を参照してください。
   - `dot -Tpng development_flow/adm.dot -o development_flow/adm.png`
 
 ## 10. トラブルシューティング

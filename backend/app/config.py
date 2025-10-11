@@ -52,3 +52,17 @@ def _build_database_url() -> str:
 
 DATABASE_URL = _build_database_url()
 DATABASE_ECHO = _bool_env("DATABASE_ECHO", default=False)
+
+
+def _float_env(name: str, default: float) -> float:
+    value = _clean_env(name)
+    if value is None:
+        return default
+    try:
+        return float(value)
+    except ValueError:
+        return default
+
+
+AI_COMPUTE_SERVER_URL = _clean_env("AI_COMPUTE_SERVER_URL")
+AI_COMPUTE_TIMEOUT = _float_env("AI_COMPUTE_TIMEOUT", default=10.0)

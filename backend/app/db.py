@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
 import secrets
 from pathlib import Path
-from typing import Iterable, Iterator, List, Optional, Sequence
+from typing import Any, Iterable, Iterator, List, Optional, Sequence, Set
 
 from sqlalchemy import (
     JSON,
@@ -28,6 +29,7 @@ from sqlalchemy import inspect
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 
 from .config import DATABASE_ECHO, DATABASE_URL
+from . import ai_client
 
 
 class Base(DeclarativeBase):
@@ -99,6 +101,8 @@ SessionLocal = sessionmaker(
     autoflush=False,
     expire_on_commit=False,
 )
+
+logger = logging.getLogger(__name__)
 
 
 # --- ORM table definitions -------------------------------------------------
@@ -201,6 +205,20 @@ class Asset(Base):
     owner_id: Mapped[int] = mapped_column(Integer)
     content_type: Mapped[str] = mapped_column(String(length=255))
     storage_key: Mapped[str] = mapped_column(String(length=1024))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class FaceEmbedding(Base):
+    """ORM representation of the face_embeddings table."""
+
+    __tablename__ = "face_embeddings"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    asset_id: Mapped[str] = mapped_column(
+        ForeignKey("assets.id", ondelete="CASCADE"), nullable=False
+    )
+    bbox: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    embedding: Mapped[List[float]] = mapped_column(JSON, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
@@ -338,6 +356,17 @@ class AlbumPhotoData:
     image_id: int
     image_url: str
     uploaded_at: datetime
+
+
+@dataclass
+class FaceMatchCandidate:
+    """Matched face suggestion payload."""
+
+    user_id: int
+    score: float
+    display_name: str
+    icon_asset_url: str | None
+    face_asset_url: str | None
 
 
 @dataclass
@@ -563,15 +592,41 @@ def _parse_participants(raw: object) -> list[int]:
     return []
 
 
-def fetch_ai_proposal_suggestion(session: Session, user_id: int) -> AIProposalSuggestion:
-    """Return the latest AI proposal suggestion for the user."""
-    observation = session.execute(
-        select(VLMObservation)
-        .where(VLMObservation.initiator_user_id == user_id)
-        .order_by(VLMObservation.created_at.desc())
-        .limit(1)
-    ).scalar_one_or_none()
+def _coerce_embedding_vector(raw: object) -> list[float] | None:
+    if not isinstance(raw, (list, tuple)):
+        return None
+    vector: list[float] = []
+    for item in raw:
+        try:
+            vector.append(float(item))
+        except (TypeError, ValueError):
+            return None
+    return vector
 
+
+def _build_observation_payload(observation: VLMObservation | None) -> dict[str, Any] | None:
+    if observation is None:
+        return None
+    return {
+        "observation_id": observation.observation_id,
+        "asset_id": observation.asset_id,
+        "model_version": observation.model_version,
+        "prompt_payload": observation.prompt_payload,
+        "schedule_candidates": observation.schedule_candidates,
+        "member_candidates": observation.member_candidates,
+        "notes": observation.notes,
+        "extra_metadata": observation.extra_metadata,
+        "latency_ms": observation.latency_ms,
+        "processed_at": observation.processed_at,
+        "created_at": observation.created_at,
+        "updated_at": observation.updated_at,
+    }
+
+
+def _derive_fallback_proposal(
+    observation: VLMObservation | None,
+    user_id: int,
+) -> tuple[str, datetime, str | None, list[int]]:
     fallback_date = datetime.now(timezone.utc) + timedelta(days=3)
 
     if observation and observation.schedule_candidates:
@@ -582,7 +637,7 @@ def fetch_ai_proposal_suggestion(session: Session, user_id: int) -> AIProposalSu
         else:
             candidate = {}
         title = candidate.get("title") or "New Gathering"
-        location = candidate.get("location")
+        location = candidate.get("location") or "Local Cafe"
         event_date = _parse_datetime(candidate.get("event_date"), fallback_date)
         participant_ids = _parse_participants(observation.member_candidates)
     else:
@@ -594,11 +649,54 @@ def fetch_ai_proposal_suggestion(session: Session, user_id: int) -> AIProposalSu
     if not participant_ids:
         participant_ids = [user_id]
 
+    return title, event_date, location, participant_ids
+
+
+def fetch_ai_proposal_suggestion(session: Session, user_id: int) -> AIProposalSuggestion:
+    """Return the latest AI proposal suggestion for the user."""
+    observation = session.execute(
+        select(VLMObservation)
+        .where(VLMObservation.initiator_user_id == user_id)
+        .order_by(VLMObservation.created_at.desc())
+        .limit(1)
+    ).scalar_one_or_none()
+
+    fallback_title, fallback_date, fallback_location, fallback_participants = _derive_fallback_proposal(
+        observation,
+        user_id,
+    )
+
+    context_payload = {
+        "user_id": user_id,
+        "observation": _build_observation_payload(observation),
+        "fallback_title": fallback_title,
+        "fallback_location": fallback_location,
+        "fallback_date": fallback_date,
+        "participant_ids": fallback_participants,
+    }
+
+    ai_suggestion = ai_client.generate_proposal_suggestion(context_payload)
+    if ai_suggestion is not None:
+        event_date = ai_suggestion.event_date
+        if event_date.tzinfo is None:
+            event_date = event_date.replace(tzinfo=timezone.utc)
+
+        location = ai_suggestion.location or fallback_location
+        participants = ai_suggestion.participant_ids or fallback_participants
+        title = ai_suggestion.title or fallback_title
+
+        return AIProposalSuggestion(
+            title=title,
+            event_date=event_date,
+            location=location,
+            participant_ids=participants,
+        )
+
     return AIProposalSuggestion(
-        title=title,
-        event_date=event_date,
-        location=location,
-        participant_ids=participant_ids,
+        title=fallback_title,
+        event_date=fallback_date,
+        location=fallback_location,
+        participant_ids=fallback_participants,
     )
 
 
@@ -1235,6 +1333,134 @@ def _create_asset(
     return asset_id, storage_key
 
 
+def _update_face_embeddings_for_asset(
+    session: Session,
+    *,
+    asset_id: str,
+    storage_key: str,
+    created_at: datetime,
+) -> None:
+    try:
+        results = ai_client.fetch_face_embeddings(storage_key)
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.warning(
+            "Unexpected error while fetching face embeddings for %s: %s",
+            storage_key,
+            exc,
+        )
+        return
+
+    if not results:
+        logger.debug(
+            "No face embeddings returned for asset %s (storage_key=%s)",
+            asset_id,
+            storage_key,
+        )
+        return
+
+    session.execute(
+        delete(FaceEmbedding).where(FaceEmbedding.asset_id == asset_id)
+    )
+
+    for item in results:
+        session.add(
+            FaceEmbedding(
+                asset_id=asset_id,
+                bbox=item.bbox,
+                embedding=item.embedding,
+                created_at=created_at,
+            )
+        )
+
+    session.flush()
+
+
+def match_faces_from_image(
+    session: Session,
+    *,
+    storage_key: str,
+    top_k: int = 5,
+    min_score: float | None = None,
+    exclude_user_ids: Iterable[int] | None = None,
+) -> list[FaceMatchCandidate]:
+    """Match a query face image against stored embeddings."""
+    if not storage_key:
+        return []
+
+    excluded: Set[int] = set()
+    for value in exclude_user_ids or []:
+        try:
+            excluded.add(int(value))
+        except (TypeError, ValueError):
+            continue
+
+    rows = session.execute(
+        select(
+            FaceEmbedding.embedding,
+            Asset.owner_id,
+            User.display_name,
+            User.icon_asset_url,
+            User.face_asset_url,
+        )
+        .join(Asset, FaceEmbedding.asset_id == Asset.id)
+        .join(User, Asset.owner_id == User.id)
+    ).all()
+
+    candidates_payload: list[dict[str, Any]] = []
+    metadata: dict[int, tuple[str, str | None, str | None]] = {}
+
+    for embedding, owner_id, display_name, icon_url, face_url in rows:
+        if owner_id in excluded:
+            continue
+        if not isinstance(embedding, (list, tuple)):
+            continue
+        candidates_payload.append(
+            {"user_id": owner_id, "embedding": embedding}
+        )
+        if owner_id not in metadata:
+            metadata[owner_id] = (
+                display_name or "",
+                icon_url,
+                face_url,
+            )
+
+    if not candidates_payload:
+        return []
+
+    matches = ai_client.match_faces(
+        storage_key=storage_key,
+        embedding=None,
+        candidates=candidates_payload,
+        top_k=top_k,
+        min_score=min_score,
+    )
+
+    if not matches:
+        return []
+
+    best_by_user: dict[int, FaceMatchCandidate] = {}
+    for match in matches:
+        info = metadata.get(match.user_id)
+        if info is None:
+            continue
+        display_name, icon_url, face_url = info
+        candidate = FaceMatchCandidate(
+            user_id=match.user_id,
+            score=match.score,
+            display_name=display_name,
+            icon_asset_url=icon_url,
+            face_asset_url=face_url,
+        )
+        existing = best_by_user.get(match.user_id)
+        if existing is None or existing.score < candidate.score:
+            best_by_user[match.user_id] = candidate
+
+    results = sorted(best_by_user.values(), key=lambda item: item.score, reverse=True)
+    if top_k is not None:
+        results = results[:top_k]
+    return results
+
+
 def upsert_user(
     session: Session,
     *,
@@ -1277,6 +1503,12 @@ def upsert_user(
     )
     user.assets_id = face_asset_id
     user.face_asset_url = face_url
+    _update_face_embeddings_for_asset(
+        session,
+        asset_id=face_asset_id,
+        storage_key=face_url,
+        created_at=now,
+    )
 
     if icon_image is not None:
         _, icon_url = _create_asset(
@@ -1325,6 +1557,12 @@ def update_user_profile(
         )
         user.assets_id = face_asset_id
         user.face_asset_url = face_url
+        _update_face_embeddings_for_asset(
+            session,
+            asset_id=face_asset_id,
+            storage_key=face_url,
+            created_at=now,
+        )
 
     if icon_image is None or icon_image == "":
         user.icon_asset_url = None

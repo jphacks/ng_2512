@@ -9,7 +9,7 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
-from sqlalchemy import create_engine, event, text as sa_text
+from sqlalchemy import create_engine, event, select, text as sa_text
 from sqlalchemy.engine import URL, make_url
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.util import typing as sa_typing
@@ -190,6 +190,19 @@ def session():
                 db_path.unlink()
 
 
+@pytest.fixture(autouse=True)
+def stub_ai_compute(monkeypatch):
+    monkeypatch.setattr(
+        db.ai_client, "fetch_face_embeddings", lambda storage_key: []
+    )
+    monkeypatch.setattr(
+        db.ai_client, "generate_proposal_suggestion", lambda context: None
+    )
+    monkeypatch.setattr(
+        db.ai_client, "match_faces", lambda **kwargs: []
+    )
+
+
 def _create_user(
     session,
     user_id: int,
@@ -307,6 +320,65 @@ def test_ai_proposal_suggestion(session):
     assert suggestion.title == "Dinner"
     assert suggestion.location == "Diner"
     assert suggestion.participant_ids == [member_one, member_two]
+
+
+def test_match_faces_from_image(session, monkeypatch):
+    user_id = _next_test_id()
+    now = datetime.now(timezone.utc)
+
+    session.add(
+        db.User(
+            id=user_id,
+            assets_id="asset-root",
+            account_id=f"acct-{user_id}",
+            display_name="Alice",
+            icon_asset_url="icon://alice",
+            face_asset_url="face://alice",
+            profile_text=None,
+        )
+    )
+    face_asset_id = f"asset-face-{uuid.uuid4().hex[:8]}"
+    session.add(
+        db.Asset(
+            id=face_asset_id,
+            owner_id=user_id,
+            content_type="image/jpeg",
+            storage_key="face://alice",
+            created_at=now,
+        )
+    )
+    session.add(
+        db.FaceEmbedding(
+            asset_id=face_asset_id,
+            bbox=None,
+            embedding=[0.1, 0.2, 0.3],
+            created_at=now,
+        )
+    )
+    session.commit()
+
+    def fake_match_faces(**kwargs):
+        assert kwargs["storage_key"] == "query://image"
+        assert len(kwargs["candidates"]) == 1
+        return [
+            db.ai_client.FaceMatchResult(user_id=user_id, score=0.85),
+        ]
+
+    monkeypatch.setattr(db.ai_client, "match_faces", fake_match_faces)
+
+    matches = db.match_faces_from_image(
+        session,
+        storage_key="query://image",
+        top_k=3,
+        min_score=0.2,
+    )
+
+    assert len(matches) == 1
+    match = matches[0]
+    assert match.user_id == user_id
+    assert match.display_name == "Alice"
+    assert match.icon_asset_url == "icon://alice"
+    assert match.score == 0.85
 
 
 def test_chat_workflow(session):
@@ -511,6 +583,40 @@ def test_user_upsert_and_search(session):
 
     results = db.search_users(session, input_text="tester")
     assert any(item.user_id == created_id for item in results)
+
+
+def test_face_embedding_stored(session, monkeypatch):
+    account_id = f"acct-{uuid.uuid4().hex[:6]}"
+    sample_embedding = [0.1, 0.2, 0.3]
+    sample_bbox = {"left": 10, "top": 20, "width": 100, "height": 120}
+    result = db.ai_client.FaceEmbeddingResult(
+        embedding=sample_embedding,
+        bbox=sample_bbox,
+    )
+
+    def fake_fetch(storage_key: str):
+        assert storage_key == "face://vector"
+        return [result]
+
+    monkeypatch.setattr(db.ai_client, "fetch_face_embeddings", fake_fetch)
+
+    user_id = db.upsert_user(
+        session,
+        account_id=account_id,
+        display_name="Vector Tester",
+        icon_image=None,
+        face_image="face://vector",
+        profile_text=None,
+    )
+    stored_user = session.get(db.User, user_id)
+    embeddings = session.execute(
+        select(db.FaceEmbedding).where(db.FaceEmbedding.asset_id == stored_user.assets_id)
+    ).scalars().all()
+
+    assert len(embeddings) == 1
+    stored_embedding = embeddings[0]
+    assert stored_embedding.embedding == sample_embedding
+    assert stored_embedding.bbox == sample_bbox
 
 
 def test_get_session_context_manager(session):

@@ -262,6 +262,36 @@ class UserUpdateRequest(BaseModel):
     profile_text: str | None = None
 
 
+class FaceMatchRequest(BaseModel):
+    storage_key: str
+    top_k: int = Field(default=5, ge=1, le=20)
+    min_score: float | None = Field(default=None, ge=0.0, le=1.0)
+    exclude_user_ids: List[int] = Field(default_factory=list)
+
+    @field_validator("exclude_user_ids", mode="before")
+    @classmethod
+    def convert_excluded(cls, value: object) -> List[int]:
+        if value is None:
+            return []
+        if not isinstance(value, list):
+            raise ValueError("exclude_user_ids must be a list.")
+        excludes: list[int] = []
+        for item in value:
+            try:
+                excludes.append(int(item))
+            except (TypeError, ValueError) as exc:
+                raise ValueError("exclude_user_ids must contain integers.") from exc
+        return excludes
+
+
+class FaceMatchCandidateResponse(BaseModel):
+    user_id: int
+    display_name: str
+    icon_asset_url: str | None = None
+    face_asset_url: str | None = None
+    score: float
+
+
 # --- FastAPI factory -------------------------------------------------------
 
 
@@ -811,6 +841,41 @@ def create_app() -> FastAPI:
             raise HTTPException(
                 status_code=503, detail="Database temporarily unavailable"
             ) from exc
+
+    # AI utilities ---------------------------------------------------------
+
+    @app.post(
+        "/api/face/match",
+        response_model=list[FaceMatchCandidateResponse],
+        tags=["ai"],
+    )
+    def match_faces(
+        payload: FaceMatchRequest,
+        session: Session = Depends(db.get_session),
+    ) -> list[FaceMatchCandidateResponse]:
+        try:
+            matches = db.match_faces_from_image(
+                session,
+                storage_key=payload.storage_key,
+                top_k=payload.top_k,
+                min_score=payload.min_score,
+                exclude_user_ids=payload.exclude_user_ids,
+            )
+        except SQLAlchemyError as exc:  # pragma: no cover - defensive
+            raise HTTPException(
+                status_code=503, detail="Database temporarily unavailable"
+            ) from exc
+
+        return [
+            FaceMatchCandidateResponse(
+                user_id=item.user_id,
+                display_name=item.display_name,
+                icon_asset_url=item.icon_asset_url,
+                face_asset_url=item.face_asset_url,
+                score=item.score,
+            )
+            for item in matches
+        ]
 
     return app
 

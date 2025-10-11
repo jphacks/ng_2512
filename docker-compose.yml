@@ -1,9 +1,24 @@
 services:
+  ai_server:
+    build:
+      context: .
+      dockerfile: AI_server/Dockerfile
+    env_file:
+      - AI_server/.env
+    volumes:
+      - ./AI_server/storage:/app/storage
+    ports:
+      - "8500:8500"
+    restart: unless-stopped
+
   backend:
     build:
       context: .
       dockerfile: backend/Dockerfile
+    environment:
+      AI_COMPUTE_SERVER_URL: http://ai_server:8500
     ports:
       - "8000:8000"
+    depends_on:
+      - ai_server
     restart: unless-stopped
-
