@@ -23,6 +23,7 @@
 
 ## CI.3 GH Actions
 - コンテナ内Unit→compose統合→GHCR push。タグ: sha-*, latest。
+- ワークフロー定義: `.github/workflows/ci.yml`
 
 ## CI.4 個人サーバ配備
 - SSHで `docker compose pull && up -d`、`flask db upgrade` 実行。
