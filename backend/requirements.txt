@@ -7,3 +7,4 @@ pymysql==1.1.1
 httpx
 numpy
 python-multipart
+dotenv
