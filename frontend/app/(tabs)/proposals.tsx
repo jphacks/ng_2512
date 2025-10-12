@@ -39,12 +39,17 @@ export default function ProposalsScreen() {
   // 提案データを取得する関数
   const fetchProposals = async () => {
     try {
+      console.log("提案取得リクエスト開始");
+
       const data = await getProposals();
+
+      console.log("提案取得レスポンス:", data);
 
       if (data) {
         setProposals(data);
+        console.log("提案データ設定完了:", data.length, "件の提案");
       } else {
-        console.error("Failed to fetch proposals");
+        console.error("Failed to fetch proposals: データが空");
       }
     } catch (error) {
       console.error("Error fetching proposals:", error);
