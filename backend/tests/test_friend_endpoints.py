@@ -2,48 +2,26 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-
 from fastapi.testclient import TestClient
 
 
-def _create_user(session, db_module, *, user_id: int, account: str, name: str, icon: str) -> None:
+def _create_user(session, db_module, *, user_id: int, account: str, name: str) -> None:
     session.add(
         db_module.User(
             id=user_id,
             assets_id=f"asset-{user_id}",
             account_id=account,
             display_name=name,
-            icon_asset_url=icon,
+            icon_asset_url=f"/assets/{account}.png",
             face_asset_url=None,
             profile_text=None,
         )
     )
 
 
-def _create_friendship(
-    session,
-    db_module,
-    *,
-    user_id: int,
-    friend_user_id: int,
-    status: str,
-    updated_at: datetime,
-) -> None:
-    session.add(
-        db_module.UserFriendship(
-            user_id=user_id,
-            friend_user_id=friend_user_id,
-            status=status,
-            updated_at=updated_at,
-        )
-    )
-
-
-def test_friend_overview_categories(client: TestClient, db_module) -> None:
+def test_friend_request_flow_and_overview(client: TestClient, db_module) -> None:
     session = db_module.SessionLocal()
     try:
-        now = datetime.now(timezone.utc)
         main_user = 1000
         accepted_friend = 1001
         incoming_friend = 1002
@@ -57,55 +35,75 @@ def test_friend_overview_categories(client: TestClient, db_module) -> None:
             (outgoing_friend, "friend-out", "Outgoing Friend"),
             (blocked_friend, "friend-block", "Blocked Friend"),
         ]:
-            _create_user(
-                session,
-                db_module,
-                user_id=uid,
-                account=account,
-                name=name,
-                icon=f"/assets/{account}.png",
-            )
-        session.flush()
-
-        _create_friendship(
-            session,
-            db_module,
-            user_id=main_user,
-            friend_user_id=accepted_friend,
-            status="accepted",
-            updated_at=now,
-        )
-        _create_friendship(
-            session,
-            db_module,
-            user_id=incoming_friend,
-            friend_user_id=main_user,
-            status="requested",
-            updated_at=now,
-        )
-        _create_friendship(
-            session,
-            db_module,
-            user_id=main_user,
-            friend_user_id=outgoing_friend,
-            status="requested",
-            updated_at=now,
-        )
-        _create_friendship(
-            session,
-            db_module,
-            user_id=main_user,
-            friend_user_id=blocked_friend,
-            status="blocked",
-            updated_at=now,
-        )
+            _create_user(session, db_module, user_id=uid, account=account, name=name)
         session.commit()
     finally:
         session.close()
 
-    response = client.get("/api/friend", params={"user_id": main_user})
-    assert response.status_code == 200
-    data = response.json()
+    # Incoming request (friend -> main)
+    resp = client.put(
+        "/api/friend/request",
+        json={
+            "user_id": incoming_friend,
+            "friend_user_id": main_user,
+            "updated_status": "requested",
+        },
+    )
+    assert resp.status_code == 200
+    assert resp.json() == {"status": "updated"}
+
+    # Outgoing request (main -> outgoing)
+    resp = client.put(
+        "/api/friend/request",
+        json={
+            "user_id": main_user,
+            "friend_user_id": outgoing_friend,
+            "updated_status": "requested",
+        },
+    )
+    assert resp.status_code == 200
+    assert resp.json() == {"status": "updated"}
+
+    # Accepted friendship (main -> accepted, then accepted -> main)
+    assert (
+        client.put(
+            "/api/friend/request",
+            json={
+                "user_id": main_user,
+                "friend_user_id": accepted_friend,
+                "updated_status": "requested",
+            },
+        ).json()
+        == {"status": "updated"}
+    )
+    assert (
+        client.put(
+            "/api/friend/request",
+            json={
+                "user_id": accepted_friend,
+                "friend_user_id": main_user,
+                "updated_status": "accepted",
+            },
+        ).json()
+        == {"status": "updated"}
+    )
+
+    # Blocked user (main blocks blocked_friend)
+    assert (
+        client.put(
+            "/api/friend/request",
+            json={
+                "user_id": main_user,
+                "friend_user_id": blocked_friend,
+                "updated_status": "blocked",
+            },
+        ).json()
+        == {"status": "updated"}
+    )
+
+    overview = client.get("/api/friend", params={"user_id": main_user})
+    assert overview.status_code == 200
+    data = overview.json()
 
     assert {entry["user_id"] for entry in data["friend"]} == {accepted_friend}
     assert {entry["user_id"] for entry in data["friend_requested"]} == {incoming_friend}
@@ -114,7 +112,20 @@ def test_friend_overview_categories(client: TestClient, db_module) -> None:
     assert data["friend_recommended"] == []
 
 
-def test_friend_search_and_empty_query(client: TestClient, db_module) -> None:
+def test_friend_request_invalid_status(client: TestClient) -> None:
+    response = client.put(
+        "/api/friend/request",
+        json={
+            "user_id": 1,
+            "friend_user_id": 2,
+            "updated_status": "not-a-status",
+        },
+    )
+    assert response.status_code == 400
+    assert "Unsupported friend status" in response.json()["detail"]
+
+
+def test_friend_search_and_empty_query(client: TestClient) -> None:
     response = client.get("/api/friend/search", params={"input_text": "Friend"})
     assert response.status_code == 200
     results = response.json()

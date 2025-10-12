@@ -224,6 +224,19 @@ class FriendSearchResult(BaseModel):
     icon_asset_url: str | None = None
 
 
+class FriendRequestUpdate(BaseModel):
+    user_id: int
+    friend_user_id: int
+    updated_status: str
+
+    @field_validator("updated_status")
+    @classmethod
+    def normalize_status(cls, value: str) -> str:
+        if not value or not value.strip():
+            raise ValueError("updated_status must not be empty.")
+        return value.strip()
+
+
 # --- FastAPI factory -------------------------------------------------------
 
 
@@ -677,6 +690,30 @@ def create_app() -> FastAPI:
             )
             for entry in matches
         ]
+
+    @app.put(
+        "/api/friend/request",
+        status_code=status.HTTP_200_OK,
+        tags=["friend"],
+    )
+    def update_friend_request(
+        payload: FriendRequestUpdate,
+        session: Session = Depends(db.get_session),
+    ) -> dict[str, str]:
+        try:
+            db.update_friend_status(
+                session,
+                user_id=payload.user_id,
+                friend_user_id=payload.friend_user_id,
+                updated_status=payload.updated_status,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except SQLAlchemyError as exc:  # pragma: no cover - defensive
+            raise HTTPException(
+                status_code=503, detail="Database temporarily unavailable"
+            ) from exc
+        return {"status": "updated"}
 
     # Face Matching ---------------------------------------------------------
 

@@ -500,6 +500,99 @@ def search_users(session: Session, *, input_text: str, limit: int = 20) -> list[
     ]
 
 
+_FRIEND_STATUS_NORMALIZATION = {
+    "request": "requested",
+    "requested": "requested",
+    "pending": "requested",
+    "accept": "accepted",
+    "accepted": "accepted",
+    "approve": "accepted",
+    "approved": "accepted",
+    "friend": "accepted",
+    "block": "blocked",
+    "blocked": "blocked",
+    "reject": "rejected",
+    "rejected": "rejected",
+    "decline": "rejected",
+    "declined": "rejected",
+    "remove": "removed",
+    "removed": "removed",
+    "cancel": "cancelled",
+    "cancelled": "cancelled",
+    "unfriend": "removed",
+    "unfriended": "removed",
+}
+
+
+def update_friend_status(
+    session: Session,
+    *,
+    user_id: int,
+    friend_user_id: int,
+    updated_status: str,
+) -> None:
+    """Create or update a friend relationship."""
+    if user_id == friend_user_id:
+        raise ValueError("user_id and friend_user_id must be different.")
+
+    normalized = _FRIEND_STATUS_NORMALIZATION.get((updated_status or "").lower())
+    if normalized is None:
+        raise ValueError("Unsupported friend status.")
+
+    now = datetime.now(timezone.utc)
+
+    def _upsert(initiator: int, target: int, status_value: str) -> None:
+        friendship = session.get(UserFriendship, (initiator, target))
+        if friendship is None:
+            friendship = UserFriendship(
+                user_id=initiator,
+                friend_user_id=target,
+                status=status_value,
+                updated_at=now,
+            )
+            session.add(friendship)
+        else:
+            friendship.status = status_value
+            friendship.updated_at = now
+
+    if normalized == "requested":
+        _upsert(user_id, friend_user_id, "requested")
+
+    elif normalized == "accepted":
+        _upsert(user_id, friend_user_id, "accepted")
+        _upsert(friend_user_id, user_id, "accepted")
+
+    elif normalized == "blocked":
+        _upsert(user_id, friend_user_id, "blocked")
+        existing = session.get(UserFriendship, (friend_user_id, user_id))
+        if existing is not None:
+            existing.status = "blocked"
+            existing.updated_at = now
+
+    elif normalized == "rejected":
+        _upsert(friend_user_id, user_id, "rejected")
+        pending = session.get(UserFriendship, (user_id, friend_user_id))
+        if pending is not None and pending.status == "requested":
+            pending.status = "rejected"
+            pending.updated_at = now
+
+    elif normalized in {"removed", "cancelled"}:
+        session.execute(
+            delete(UserFriendship).where(
+                (UserFriendship.user_id == user_id)
+                & (UserFriendship.friend_user_id == friend_user_id)
+            )
+        )
+        session.execute(
+            delete(UserFriendship).where(
+                (UserFriendship.user_id == friend_user_id)
+                & (UserFriendship.friend_user_id == user_id)
+            )
+        )
+
+    session.commit()
+
+
 def count_unread_messages(session: Session, user_id: int) -> int:
     """Return the total number of unread chat messages for the user."""
     memberships = session.execute(
