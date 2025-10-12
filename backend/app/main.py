@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from . import ai_service, db
+from . import ai_service, db, storage
 
 
 # --- Pydantic schemas ------------------------------------------------------
@@ -565,23 +565,32 @@ def create_app() -> FastAPI:
         status_code=status.HTTP_201_CREATED,
         tags=["album"],
     )
-    def add_album_photos(
+    async def add_album_photos(
         album_id: int = Path(..., description="Album identifier"),
-        payload: AlbumPhotoUploadRequest = Body(...),
+        photos: list[UploadFile] = File(..., alias="photo", description="Album photos"),
         session: Session = Depends(db.get_session),
-    ) -> dict[str, list[int]]:
+        album_storage: storage.AlbumPhotoStorage = Depends(storage.get_album_storage),
+    ) -> None:
+        if not photos:
+            raise HTTPException(status_code=400, detail="photo must contain at least one file.")
+
         try:
-            photos = db.add_album_photos(
+            photo_urls = await album_storage.upload(album_id=album_id, files=photos)
+        except storage.StorageConfigurationError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except storage.StorageUploadError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+        try:
+            db.add_album_photos(
                 session,
                 album_id=album_id,
-                photo_urls=payload.photo,
+                photo_urls=photo_urls,
             )
         except SQLAlchemyError as exc:  # pragma: no cover - defensive
             raise HTTPException(
                 status_code=503, detail="Database temporarily unavailable"
             ) from exc
-
-        return {"image_ids": [photo.image_id for photo in photos]}
 
     @app.put(
         "/api/albam/{album_id}",
@@ -651,4 +660,3 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
-
