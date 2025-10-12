@@ -647,6 +647,73 @@ def create_app() -> FastAPI:
         else:
             return FaceMatchResponse(user_id=None, display_name=None, match_confidence=None)
 
+    # User Management ------------------------------------------------------
+
+    class CreateUserResponse(BaseModel):
+        user_id: int
+
+    @app.post(
+        "/api/user/create",
+        response_model=CreateUserResponse,
+        status_code=status.HTTP_201_CREATED,
+        tags=["user"],
+    )
+    async def create_user(
+        account_id: str = Form(...),
+        display_name: str = Form(...),
+        profile_text: str | None = Form(None),
+        icon_image: UploadFile | None = File(None),
+        face_image: UploadFile = File(...),
+        session: Session = Depends(db.get_session),
+    ) -> CreateUserResponse:
+        icon_image_url = await ai_service.upload_image(icon_image) if icon_image else None
+        face_image_url = await ai_service.upload_image(face_image)
+
+        try:
+            user_id = db.create_user(
+                session,
+                account_id=account_id,
+                display_name=display_name,
+                icon_image=icon_image_url,
+                face_image=face_image_url,
+                profile_text=profile_text,
+            )
+        except SQLAlchemyError as exc:  # pragma: no cover - defensive
+            raise HTTPException(
+                status_code=503, detail="Database temporarily unavailable"
+            ) from exc
+        return CreateUserResponse(user_id=user_id)
+
+    @app.put("/api/user", status_code=status.HTTP_204_NO_CONTENT, tags=["user"])
+    async def update_user(
+        user_id: int = Form(...),
+        account_id: str = Form(...),
+        display_name: str = Form(...),
+        profile_text: str | None = Form(None),
+        icon_image: UploadFile | None = File(None),
+        face_image: UploadFile | None = File(None),
+        session: Session = Depends(db.get_session),
+    ) -> None:
+        icon_image_url = await ai_service.upload_image(icon_image) if icon_image else None
+        face_image_url = await ai_service.upload_image(face_image) if face_image else None
+
+        try:
+            db.update_user(
+                session,
+                user_id=user_id,
+                account_id=account_id,
+                display_name=display_name,
+                icon_image=icon_image_url,
+                face_image=face_image_url,
+                profile_text=profile_text,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except SQLAlchemyError as exc:  # pragma: no cover - defensive
+            raise HTTPException(
+                status_code=503, detail="Database temporarily unavailable"
+            ) from exc
+
     return app
 
 

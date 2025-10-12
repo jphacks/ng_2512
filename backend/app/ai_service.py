@@ -100,3 +100,19 @@ async def generate_embedding_from_url(image_url: str) -> list[float] | None:
 
         except httpx.RequestError:
             return None
+
+
+async def upload_image(file: UploadFile) -> str:
+    """Uploads an image and returns its URL."""
+    # In a real application, this would upload the file to a cloud storage
+    # and return the URL. For now, we'll just return a dummy path.
+    # To prevent overwriting, you might use a unique filename:
+    # import uuid
+    # filename = f"{uuid.uuid4()}.{file.filename.split('.')[-1] if '.' in file.filename else 'png'}"
+    # save_path = f"/assets/images/{filename}"
+    # with open(save_path, "wb") as buffer:
+    #     buffer.write(await file.read())
+    # return save_path
+
+    # For this prototype, we return a fixed path.
+    return f"/assets/images/{file.filename}"

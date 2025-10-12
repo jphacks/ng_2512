@@ -1032,3 +1032,69 @@ async def find_user_by_face_embedding(
         return best_match_user, highest_similarity
     else:
         return None, 0.0
+
+
+# --- User queries ----------------------------------------------------------
+
+def create_user(
+    session: Session,
+    *,
+    account_id: str,
+    display_name: str,
+    icon_image: str | None,
+    face_image: str,
+    profile_text: str | None,
+) -> int:
+    """Create or update a user and return the user ID."""
+    user = session.execute(
+        select(User).where(User.account_id == account_id)
+    ).scalar_one_or_none()
+
+    if user:
+        # Update existing user
+        user.display_name = display_name
+        user.profile_text = profile_text
+        if icon_image:
+            user.icon_asset_url = icon_image
+        if face_image:
+            user.face_asset_url = face_image
+    else:
+        # Create new user
+        user = User(
+            account_id=account_id,
+            display_name=display_name,
+            icon_asset_url=icon_image,
+            face_asset_url=face_image,
+            profile_text=profile_text,
+            assets_id="",  # This might need a better default
+        )
+        session.add(user)
+
+    session.commit()
+    return user.id
+
+
+def update_user(
+    session: Session,
+    *,
+    user_id: int,
+    account_id: str,
+    display_name: str,
+    icon_image: str | None,
+    face_image: str | None,
+    profile_text: str | None,
+) -> None:
+    """Update a user's profile."""
+    user = session.get(User, user_id)
+    if not user:
+        raise ValueError("User not found.")
+
+    user.account_id = account_id
+    user.display_name = display_name
+    user.profile_text = profile_text
+    if icon_image:
+        user.icon_asset_url = icon_image
+    if face_image:
+        user.face_asset_url = face_image
+
+    session.commit()
