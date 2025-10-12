@@ -360,3 +360,54 @@ export const searchFriends = async (
   console.log("searchFriends result:", result);
   return result.data || null;
 };
+
+// フレンド申請を送る
+export const sendFriendRequest = async (
+  targetUserId: number
+): Promise<boolean> => {
+  const result = await withUserId(async (userId) => {
+    return apiClient.put("/api/friend/request", {
+      user_id: userId,
+      friend_user_id: targetUserId,
+      updated_status: "requested", // 2: "requested"
+    });
+  });
+
+  if (result.error) {
+    console.error("Friend request failed:", result.error);
+    return false;
+  }
+
+  return true;
+};
+
+// フレンド申請を承認・拒否する
+export const respondToFriendRequest = async (
+  friendUserId: number,
+  action: "accept" | "reject"
+): Promise<boolean> => {
+  const result = await withUserId(async (userId) => {
+    return apiClient.put("/api/friend/request", {
+      user_id: userId,
+      friend_user_id: friendUserId,
+      updated_status: action === "accept" ? "accepted" : "declined", // 1: "accepted", 0: "declined"
+    });
+  });
+
+  if (result.error) {
+    console.error("Friend request response failed:", result.error);
+    return false;
+  }
+
+  return true;
+};
+
+// Album関連のAPI呼び出し
+export const getAlbums = async (
+  oldestAlbumId?: number
+): Promise<Album[] | null> => {
+  const result = await withUserIdInQuery<Album[]>("/api/album", {
+    oldest_album_id: oldestAlbumId || null,
+  });
+  return result.data || null;
+};

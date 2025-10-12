@@ -17,6 +17,8 @@ import { Colors } from "@/constants/theme";
 import {
   getFriends,
   searchFriends,
+  sendFriendRequest,
+  respondToFriendRequest,
   User,
   FriendData,
 } from "@/services/api-client";
@@ -91,6 +93,41 @@ export default function FriendsScreen() {
     </View>
   );
 
+  const renderSearchResult = ({ item }: { item: User }) => (
+    <View style={styles.friendCard}>
+      <View style={styles.friendInfo}>
+        <View style={styles.avatarContainer}>
+          <View
+            style={[
+              styles.avatar,
+              { backgroundColor: Colors.light.tint + "20" },
+            ]}
+          >
+            <Text style={[styles.avatarText, { color: Colors.light.tint }]}>
+              {item.display_name.charAt(0)}
+            </Text>
+          </View>
+        </View>
+        <View style={styles.friendDetails}>
+          <Text style={[styles.friendName, { color: textColor }]}>
+            {item.display_name}
+          </Text>
+          <Text style={styles.username}>@{item.account_id}</Text>
+        </View>
+      </View>
+      <TouchableOpacity
+        style={[
+          styles.friendRequestButton,
+          { backgroundColor: Colors.light.tint },
+        ]}
+        onPress={() => handleSendFriendRequest(item)}
+      >
+        <IconSymbol name="person.badge.plus" size={16} color="white" />
+        <Text style={styles.friendRequestButtonText}>申請</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
   const renderFriendRequest = ({ item }: { item: User }) => (
     <View style={styles.requestCard}>
       <View style={styles.friendInfo}>
@@ -130,12 +167,48 @@ export default function FriendsScreen() {
     </View>
   );
 
-  const handleFriendRequest = (userId: number, action: "accept" | "reject") => {
-    // API呼び出し処理をここに実装
-    Alert.alert(
-      action === "accept" ? "フレンド申請承認" : "フレンド申請拒否",
-      `${action === "accept" ? "承認" : "拒否"}しました`
-    );
+  const handleFriendRequest = async (
+    userId: number,
+    action: "accept" | "reject"
+  ) => {
+    try {
+      const success = await respondToFriendRequest(userId, action);
+      if (success) {
+        Alert.alert(
+          action === "accept" ? "フレンド申請承認" : "フレンド申請拒否",
+          `${action === "accept" ? "承認" : "拒否"}しました`
+        );
+
+        // フレンドデータを再取得してUIを更新
+        await fetchFriendData();
+      } else {
+        Alert.alert("エラー", "処理に失敗しました。もう一度お試しください。");
+      }
+    } catch (error) {
+      console.error("Friend request response error:", error);
+      Alert.alert("エラー", "処理に失敗しました。もう一度お試しください。");
+    }
+  };
+
+  const handleSendFriendRequest = async (user: User) => {
+    try {
+      const success = await sendFriendRequest(user.user_id);
+      if (success) {
+        Alert.alert(
+          "フレンド申請送信",
+          `${user.display_name}さんにフレンド申請を送信しました`
+        );
+        // 検索結果から削除（既に申請済みとして扱う）
+        setSearchResults((prev) =>
+          prev.filter((u) => u.user_id !== user.user_id)
+        );
+      } else {
+        Alert.alert("エラー", "フレンド申請の送信に失敗しました");
+      }
+    } catch (error) {
+      console.error("Friend request error:", error);
+      Alert.alert("エラー", "フレンド申請の送信に失敗しました");
+    }
   };
 
   const handleSearch = async () => {
@@ -261,7 +334,9 @@ export default function FriendsScreen() {
                     ? searchResults
                     : friendData.friend_recommended
                 }
-                renderItem={renderFriend}
+                renderItem={
+                  searchQuery.trim() ? renderSearchResult : renderFriend
+                }
                 keyExtractor={(item) => item.user_id.toString()}
                 showsVerticalScrollIndicator={false}
                 ListEmptyComponent={
@@ -615,5 +690,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     opacity: 0.7,
     textAlign: "center",
+  },
+  friendRequestButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+    gap: 4,
+  },
+  friendRequestButtonText: {
+    color: "white",
+    fontSize: 12,
+    fontWeight: "600",
   },
 });

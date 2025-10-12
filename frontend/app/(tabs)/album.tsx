@@ -18,16 +18,9 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import {
   apiClient,
   withUserId,
+  getAlbums,
   Album as ApiAlbum,
 } from "@/services/api-client";
-
-interface Album {
-  album_id: number;
-  title: string;
-  last_uploaded_image_url: string;
-  image_num: number;
-  shared_user_num: number;
-}
 
 export default function AlbumScreen() {
   const colorScheme = useColorScheme();
@@ -40,17 +33,11 @@ export default function AlbumScreen() {
   // アルバム一覧を取得する関数
   const fetchAlbums = async () => {
     try {
-      const result = await withUserId(async (userId) => {
-        return apiClient.get<ApiAlbum[]>("/api/album", {
-          user_id: userId,
-          oldest_album_id: null,
-        });
-      });
-
-      if (result.data) {
-        setAlbums(result.data);
+      const data = await getAlbums();
+      if (data) {
+        setAlbums(data);
       } else {
-        console.error("Failed to fetch albums:", result.error);
+        console.error("Failed to fetch albums");
       }
     } catch (error) {
       console.error("Error fetching albums:", error);
@@ -100,7 +87,7 @@ export default function AlbumScreen() {
     });
   };
 
-  const renderAlbumCard = ({ item }: { item: Album }) => (
+  const renderAlbumCard = ({ item }: { item: ApiAlbum }) => (
     <TouchableOpacity
       style={styles.albumCard}
       onPress={() => handleAlbumPress(item)}
@@ -112,14 +99,16 @@ export default function AlbumScreen() {
         />
         <View style={styles.photoCountBadge}>
           <IconSymbol name="photo" size={12} color="white" />
-          <Text style={styles.photoCountText}>{item.image_num}</Text>
+          <Text style={styles.photoCountText}>{item.image_num || 0}</Text>
         </View>
       </View>
       <View style={styles.albumInfo}>
         <Text style={styles.albumTitle}>{item.title}</Text>
         <View style={styles.sharedInfo}>
           <IconSymbol name="person.2" size={16} color={colors.textSecondary} />
-          <Text style={styles.sharedText}>{item.shared_user_num}人で共有</Text>
+          <Text style={styles.sharedText}>
+            {item.shared_user_num || 0}人で共有
+          </Text>
         </View>
       </View>
     </TouchableOpacity>
@@ -165,7 +154,9 @@ export default function AlbumScreen() {
         showsVerticalScrollIndicator={false}
         data={albums}
         renderItem={renderAlbumCard}
-        keyExtractor={(item) => item.album_id.toString()}
+        keyExtractor={(item) =>
+          item.album_id?.toString() || `album-${Math.random()}`
+        }
         numColumns={2}
         columnWrapperStyle={styles.albumRow}
         ListHeaderComponent={
@@ -201,7 +192,10 @@ export default function AlbumScreen() {
                 ]}
               >
                 <Text style={[styles.statNumber, { color: "#f6339a" }]}>
-                  {albums.reduce((total, album) => total + album.image_num, 0)}
+                  {albums.reduce(
+                    (total, album) => total + (album.image_num || 0),
+                    0
+                  )}
                 </Text>
                 <Text
                   style={[styles.statLabel, { color: colors.textSecondary }]}
@@ -217,7 +211,7 @@ export default function AlbumScreen() {
               >
                 <Text style={[styles.statNumber, { color: "#2b7fff" }]}>
                   {albums.reduce(
-                    (total, album) => total + album.shared_user_num,
+                    (total, album) => total + (album.shared_user_num || 0),
                     0
                   )}
                 </Text>
