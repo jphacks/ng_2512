@@ -126,14 +126,13 @@ def test_friend_request_invalid_status(client: TestClient) -> None:
 
 
 def test_friend_search_and_empty_query(client: TestClient) -> None:
-    response = client.get("/api/friend/search", params={"input_text": "Friend"})
+    response = client.post("/api/friend/search", json={"input_text": "Friend"})
     assert response.status_code == 200
     results = response.json()
     assert any(entry["account_id"] == "friend-accepted" for entry in results)
 
-    empty_response = client.get("/api/friend/search", params={"input_text": "   "})
-    assert empty_response.status_code == 200
-    assert empty_response.json() == []
+    empty_response = client.post("/api/friend/search", json={"input_text": "   "})
+    assert empty_response.status_code == 422
 
 
 def test_album_alias_route_returns_ok(client: TestClient) -> None:

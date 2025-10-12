@@ -224,6 +224,17 @@ class FriendSearchResult(BaseModel):
     icon_asset_url: str | None = None
 
 
+class FriendSearchRequest(BaseModel):
+    input_text: str
+
+    @field_validator("input_text")
+    @classmethod
+    def validate_input_text(cls, value: str) -> str:
+        if not value or not value.strip():
+            raise ValueError("input_text must not be empty.")
+        return value.strip()
+
+
 class FriendRequestUpdate(BaseModel):
     user_id: int
     friend_user_id: int
@@ -662,20 +673,13 @@ def create_app() -> FastAPI:
             ],
         )
 
-    @app.get(
-        "/api/friend/search",
-        response_model=list[FriendSearchResult],
-        tags=["friend"],
-    )
+    @app.post("/api/friend/search", response_model=list[FriendSearchResult], tags=["friend"])
     def search_friends(
-        input_text: str = Query(..., description="Search keyword"),
+        payload: FriendSearchRequest = Body(...),
         session: Session = Depends(db.get_session),
     ) -> list[FriendSearchResult]:
-        if not input_text.strip():
-            return []
-
         try:
-            matches = db.search_users(session, input_text=input_text)
+            matches = db.search_users(session, input_text=payload.input_text)
         except SQLAlchemyError as exc:  # pragma: no cover - defensive
             raise HTTPException(
                 status_code=503, detail="Database temporarily unavailable"

@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import os
 from dataclasses import dataclass, field
+from itertools import combinations
 from datetime import date, datetime, timedelta, timezone
 import secrets
 from pathlib import Path
@@ -591,6 +592,37 @@ def update_friend_status(
         )
 
     session.commit()
+
+
+def befriend_all_users(session: Session) -> int:
+    """Ensure every user is friends with every other user."""
+    user_ids = session.scalars(select(User.id)).all()
+    if len(user_ids) < 2:
+        return 0
+
+    now = datetime.now(timezone.utc)
+    operations = 0
+
+    for first_id, second_id in combinations(user_ids, 2):
+        for initiator, target in ((first_id, second_id), (second_id, first_id)):
+            friendship = session.get(UserFriendship, (initiator, target))
+            if friendship is None:
+                session.add(
+                    UserFriendship(
+                        user_id=initiator,
+                        friend_user_id=target,
+                        status="accepted",
+                        updated_at=now,
+                    )
+                )
+                operations += 1
+            elif friendship.status != "accepted":
+                friendship.status = "accepted"
+                friendship.updated_at = now
+                operations += 1
+
+    session.commit()
+    return operations
 
 
 def count_unread_messages(session: Session, user_id: int) -> int:
