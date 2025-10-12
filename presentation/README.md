@@ -1,6 +1,8 @@
 # Recall - 再会のきっかけを作るソーシャルアプリ
 
-[![IMAGE ALT TEXT HERE](https://jphacks.com/wp-content/uploads/2025/05/JPHACKS2025_ogp.jpg)](https://www.youtube.com/watch?v=lA9EluZugD8)
+<div align="center">
+   <img src="main.png" width="250"　alt="メイン画面">
+</div>
 
 ## 製品概要
 
@@ -35,11 +37,11 @@ CLIP モデルによる画像解析と顔認識技術を組み合わせ、過去
 - フレンド管理とプライバシー保護の両立
 
 ### 今後の展望
-
-- より精度の高い画像解析とコンテキスト理解
-- ユーザーの行動パターンを学習した提案最適化
-- イベント情報やローカル情報と連携した提案の充実
-- 企業や団体向けの同窓会・懇親会支援機能
+- バックエンドとフロントエンド側がうまく連携できず，機能の大部分が動作させられなかった．
+そのため，チャット機能やフレンド登録，ログイン機能などを実装する．
+- ViTといった顔認識技術を使用することで，自動的にフレンドを提案する機能の実装
+- 日程調整サポートbotといった，再び集まりやすくする機能の追加
+- 実際にデプロイを目指す
 
 ### 注力したこと（こだわり等）
 
@@ -50,33 +52,22 @@ CLIP モデルによる画像解析と顔認識技術を組み合わせ、過去
 
 ### 活用した技術
 
-#### API・データ
-
-- Firebase (Firestore/Auth/Functions/Cloud Messaging)
+- Hagging Face - AIモデル
 - FastAPI (Python) - AI サービスとデータ処理
-- PostgreSQL with pgvector - ベクトル検索
-- Redis - セッション管理とキューイング
-
-#### フレームワーク・ライブラリ・モジュール
-
 - React Native (Expo) - クロスプラットフォームモバイルアプリ
 - OpenCLIP (ViT-B/32) - 画像理解
 - ArcFace/MobileFaceNet - 顔認識
-- vLLM - ローカル LLM 推論
-- SQLAlchemy - ORM
-- React Navigation - ナビゲーション
+- AWS - S3やRDS, EC2等のインフラ技術
+
 
 #### デバイス
 
 - iOS / Android モバイルデバイス
 - Docker - 開発・本番環境
-- ONNX Runtime - AI モデル推論最適化
 
 ### 独自技術
 
 #### ハッカソンで開発した独自機能・技術
 
-- 写真解析から再会提案まで一貫した AI パイプライン機能（`backend/app/ai/` - 画像解析から LLM 生成まで）
-- 匿名提案システムによる心理的ハードル軽減 UX（`mobile/app/(tabs)/proposals.tsx`, `docs/features/proposal.md`）
-- ローカル AI によるプライバシー重視の顔認識・マッチング機能（`docs/features/people_match.md`）
-- 思い出ジャーナルと連携した自動提案生成システム（`docs/features/journal.md`, `docs/features/ai_proposal.md`）
+- ローカルLLMを利用したセキュアなAIシステム
+- 顔認識データベースとチャット/フレンド管理を連携させた再会サポート基盤
