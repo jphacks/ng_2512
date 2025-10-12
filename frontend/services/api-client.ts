@@ -332,6 +332,13 @@ export interface NotificationData {
   friend_request_num: number;
 }
 
+export interface AIProposalData {
+  title: string;
+  event_date: string;
+  location: string;
+  participant_ids: string[];
+}
+
 // API呼び出し用のヘルパー関数
 export const getNotifications = async (): Promise<NotificationData | null> => {
   const result = await withUserIdInQuery<NotificationData>("/api/notification");
@@ -341,6 +348,11 @@ export const getNotifications = async (): Promise<NotificationData | null> => {
 // Proposal関連のAPI呼び出し
 export const getProposals = async (): Promise<Proposal[] | null> => {
   const result = await withUserIdInQuery<Proposal[]>("/api/proposal");
+  return result.data || null;
+};
+
+export const generateAIProposal = async (): Promise<AIProposalData | null> => {
+  const result = await withUserIdInQuery<AIProposalData>("/api/proposal/ai");
   return result.data || null;
 };
 
@@ -409,5 +421,18 @@ export const getAlbums = async (
   const result = await withUserIdInQuery<Album[]>("/api/album", {
     oldest_album_id: oldestAlbumId || null,
   });
+  return result.data || null;
+};
+
+export const getAlbumImages = async (
+  albumId: number,
+  oldestImageId?: number
+): Promise<AlbumImage[] | null> => {
+  const result = await withUserIdInQuery<AlbumImage[]>(
+    `/api/album/${albumId}`,
+    {
+      oldest_image_id: oldestImageId || null,
+    }
+  );
   return result.data || null;
 };

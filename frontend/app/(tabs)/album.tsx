@@ -34,10 +34,21 @@ export default function AlbumScreen() {
   const fetchAlbums = async () => {
     try {
       const data = await getAlbums();
+      console.log("Albums API response:", data);
       if (data) {
-        setAlbums(data);
+        // データの構造を確認
+        console.log("Albums data structure:", JSON.stringify(data, null, 2));
+
+        // APIレスポンスのキー名を正規化（albam_id -> album_id）
+        const normalizedData = data.map((album: any) => ({
+          ...album,
+          album_id: album.album_id || album.albam_id, // タイポ対応
+        }));
+
+        console.log("Normalized albums:", normalizedData);
+        setAlbums(normalizedData);
       } else {
-        console.error("Failed to fetch albums");
+        console.error("Failed to fetch albums: data is null");
       }
     } catch (error) {
       console.error("Error fetching albums:", error);
@@ -49,6 +60,11 @@ export default function AlbumScreen() {
   useEffect(() => {
     fetchAlbums();
   }, []);
+
+  useEffect(() => {
+    console.log("Albums state changed:", albums);
+    console.log("Albums length:", albums.length);
+  }, [albums]);
 
   const handleCreateAlbum = async () => {
     if (!albumTitle.trim()) return;
@@ -81,38 +97,60 @@ export default function AlbumScreen() {
 
   const handleAlbumPress = (album: ApiAlbum) => {
     // アルバム詳細画面への遷移
-    router.push({
-      pathname: "/album/[id]",
-      params: { id: album.album_id.toString() },
-    });
+    const albumId = album.album_id || (album as any).albam_id;
+    if (albumId) {
+      router.push({
+        pathname: "/album/[id]",
+        params: { id: albumId.toString() },
+      });
+    } else {
+      console.error("Album ID is undefined:", album);
+    }
   };
 
-  const renderAlbumCard = ({ item }: { item: ApiAlbum }) => (
-    <TouchableOpacity
-      style={styles.albumCard}
-      onPress={() => handleAlbumPress(item)}
-    >
-      <View style={styles.albumImageContainer}>
-        <Image
-          source={{ uri: item.last_uploaded_image_url }}
-          style={styles.albumImage}
-        />
-        <View style={styles.photoCountBadge}>
-          <IconSymbol name="photo" size={12} color="white" />
-          <Text style={styles.photoCountText}>{item.image_num || 0}</Text>
+  const renderAlbumCard = ({ item }: { item: ApiAlbum }) => {
+    console.log("Rendering album card for item:", item);
+
+    // データの安全性をチェック（albam_idのタイポにも対応）
+    const albumId = item.album_id || (item as any).albam_id;
+    if (!item || !albumId) {
+      console.warn("Invalid album data:", item);
+      return null;
+    }
+
+    console.log("Album card will render for:", item.title);
+
+    return (
+      <TouchableOpacity
+        style={styles.albumCard}
+        onPress={() => handleAlbumPress(item)}
+      >
+        <View style={styles.albumImageContainer}>
+          <Image
+            source={{ uri: item.last_uploaded_image_url }}
+            style={styles.albumImage}
+          />
+          <View style={styles.photoCountBadge}>
+            <IconSymbol name="photo" size={12} color="white" />
+            <Text style={styles.photoCountText}>{item.image_num || 0}</Text>
+          </View>
         </View>
-      </View>
-      <View style={styles.albumInfo}>
-        <Text style={styles.albumTitle}>{item.title}</Text>
-        <View style={styles.sharedInfo}>
-          <IconSymbol name="person.2" size={16} color={colors.textSecondary} />
-          <Text style={styles.sharedText}>
-            {item.shared_user_num || 0}人で共有
-          </Text>
+        <View style={styles.albumInfo}>
+          <Text style={styles.albumTitle}>{item.title || "名前なし"}</Text>
+          <View style={styles.sharedInfo}>
+            <IconSymbol
+              name="person.2"
+              size={16}
+              color={colors.textSecondary}
+            />
+            <Text style={styles.sharedText}>
+              {item.shared_user_num || 0}人で共有
+            </Text>
+          </View>
         </View>
-      </View>
-    </TouchableOpacity>
-  );
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <SafeAreaView
@@ -152,11 +190,18 @@ export default function AlbumScreen() {
       <FlatList
         style={styles.content}
         showsVerticalScrollIndicator={false}
-        data={albums}
+        data={albums.filter((album) => {
+          console.log("Filtering album:", album);
+          const albumId = album.album_id || (album as any).albam_id;
+          const isValid = album && albumId;
+          console.log("Album is valid:", isValid);
+          return isValid;
+        })}
         renderItem={renderAlbumCard}
-        keyExtractor={(item) =>
-          item.album_id?.toString() || `album-${Math.random()}`
-        }
+        keyExtractor={(item) => {
+          const albumId = item.album_id || (item as any).albam_id;
+          return albumId?.toString() || `album-${Math.random()}`;
+        }}
         numColumns={2}
         columnWrapperStyle={styles.albumRow}
         ListHeaderComponent={

@@ -16,6 +16,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { apiClient, withUserId, User } from "@/services/api-client";
+import { useUserId } from "@/hooks/use-user-id";
 
 interface CreateGroupProps {
   visible: boolean;
@@ -34,6 +35,7 @@ export default function CreateGroupScreen({
   visible,
   onClose,
 }: CreateGroupProps) {
+  const { userId } = useUserId();
   const [groupName, setGroupName] = useState("");
   const [member_ids, setMemberIds] = useState<number[]>([]);
   const [friends, setFriends] = useState<User[]>([]);
@@ -90,11 +92,21 @@ export default function CreateGroupScreen({
       Alert.alert("エラー", "少なくとも1人のメンバーを選択してください");
       return;
     }
+    if (!userId) {
+      Alert.alert("エラー", "ユーザーIDが取得できません");
+      return;
+    }
 
     try {
+      // 自分のuser_idも含めたメンバーリストを作成
+      const allMemberIds = [...member_ids];
+      if (!allMemberIds.includes(userId)) {
+        allMemberIds.push(userId);
+      }
+
       const result = await apiClient.post("/api/chat/groupe", {
         title: groupName.trim(),
-        member_ids: member_ids.map((id) => id.toString()),
+        member_ids: allMemberIds.map((id) => id.toString()),
       });
 
       if (result.error) {

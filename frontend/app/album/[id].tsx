@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -15,12 +15,11 @@ import { useLocalSearchParams, router } from "expo-router";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Colors } from "@/constants/theme";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { getAlbumImages, AlbumImage } from "@/services/api-client";
+import { useUserId } from "@/hooks/use-user-id";
 import * as ImagePicker from "expo-image-picker";
 
-interface Photo {
-  image_id: number;
-  image_url: string;
-  is_creator?: boolean;
+interface Photo extends AlbumImage {
   isSelected?: boolean;
   isUploading?: boolean;
 }
@@ -34,92 +33,65 @@ interface User {
 
 export default function AlbumDetailScreen() {
   const { id } = useLocalSearchParams();
+  const { userId } = useUserId();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
 
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [activeTab, setActiveTab] = useState<"title" | "sharing">("sharing");
   const [selectionMode, setSelectionMode] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  // Sample album data
-  const albumTitle = "夏の思い出";
-  const albumSubtitle = "12枚 • 3人で共有";
+  // アルバム情報
+  const [albumTitle, setAlbumTitle] = useState("アルバム");
+  const [albumSubtitle, setAlbumSubtitle] = useState("読み込み中...");
 
-  // API仕様に合わせたモックデータ
-  const [photos, setPhotos] = useState<Photo[]>([
-    {
-      image_id: 1,
-      image_url: "https://picsum.photos/200/200?random=1",
-      is_creator: true,
-      isSelected: false,
-    },
-    {
-      image_id: 2,
-      image_url: "https://picsum.photos/200/200?random=2",
-      is_creator: false,
-      isSelected: false,
-    },
-    {
-      image_id: 3,
-      image_url: "https://picsum.photos/200/200?random=3",
-      is_creator: true,
-      isSelected: false,
-    },
-    {
-      image_id: 4,
-      image_url: "https://picsum.photos/200/200?random=4",
-      is_creator: false,
-      isSelected: false,
-    },
-    {
-      image_id: 5,
-      image_url: "https://picsum.photos/200/200?random=5",
-      is_creator: true,
-      isSelected: false,
-    },
-    {
-      image_id: 6,
-      image_url: "https://picsum.photos/200/200?random=6",
-      is_creator: false,
-      isSelected: false,
-    },
-    {
-      image_id: 7,
-      image_url: "https://picsum.photos/200/200?random=7",
-      is_creator: true,
-      isSelected: false,
-    },
-    {
-      image_id: 8,
-      image_url: "https://picsum.photos/200/200?random=8",
-      is_creator: false,
-      isSelected: false,
-    },
-    {
-      image_id: 9,
-      image_url: "https://picsum.photos/200/200?random=9",
-      is_creator: true,
-      isSelected: false,
-    },
-    {
-      image_id: 10,
-      image_url: "https://picsum.photos/200/200?random=10",
-      is_creator: false,
-      isSelected: false,
-    },
-    {
-      image_id: 11,
-      image_url: "https://picsum.photos/200/200?random=11",
-      is_creator: true,
-      isSelected: false,
-    },
-    {
-      image_id: 12,
-      image_url: "https://picsum.photos/200/200?random=12",
-      is_creator: false,
-      isSelected: false,
-    },
-  ]);
+  // APIから取得する写真データ
+  const [photos, setPhotos] = useState<Photo[]>([]);
+
+  // アルバムの写真データを取得する関数
+  const fetchAlbumImages = async () => {
+    if (!id || Array.isArray(id)) {
+      console.error("Invalid album ID:", id);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const albumId = parseInt(id, 10);
+      const data = await getAlbumImages(albumId);
+
+      console.log("Album images API response:", data);
+
+      if (data) {
+        // データを正規化してPhoto型に変換
+        const normalizedPhotos: Photo[] = data.map((image) => ({
+          ...image,
+          isSelected: false,
+          isUploading: false,
+        }));
+
+        setPhotos(normalizedPhotos);
+
+        // アルバム情報を更新
+        const photoCount = normalizedPhotos.length;
+        const sharedUserCount = 1; // TODO: 共有ユーザー数をAPIから取得
+        setAlbumSubtitle(`${photoCount}枚 • ${sharedUserCount}人で共有`);
+      } else {
+        console.error("Failed to fetch album images");
+        setPhotos([]);
+      }
+    } catch (error) {
+      console.error("Error fetching album images:", error);
+      setPhotos([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAlbumImages();
+  }, [id]);
 
   // Sample users data
   const [users, setUsers] = useState<User[]>([
@@ -213,6 +185,7 @@ export default function AlbumDetailScreen() {
         const newUploadingPhotos = result.assets.map((asset, index) => ({
           image_id: Date.now() + index,
           image_url: asset.uri,
+          is_creator: true,
           isSelected: false,
           isUploading: true,
         }));
@@ -352,14 +325,22 @@ export default function AlbumDetailScreen() {
       </View>
 
       {/* Photo Grid */}
-      <FlatList
-        data={[...uploadingPhotos, ...photos]}
-        renderItem={renderPhoto}
-        numColumns={3}
-        contentContainerStyle={styles.photoGrid}
-        showsVerticalScrollIndicator={false}
-        keyExtractor={(item) => item.image_id.toString()}
-      />
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <Text style={[styles.loadingText, { color: colors.text }]}>
+            読み込み中...
+          </Text>
+        </View>
+      ) : (
+        <FlatList
+          data={[...uploadingPhotos, ...photos]}
+          renderItem={renderPhoto}
+          numColumns={3}
+          contentContainerStyle={styles.photoGrid}
+          showsVerticalScrollIndicator={false}
+          keyExtractor={(item) => item.image_id.toString()}
+        />
+      )}
 
       {/* Settings Modal */}
       <Modal
@@ -1045,5 +1026,15 @@ const styles = StyleSheet.create({
   photoModalImage: {
     width: "100%",
     height: "100%",
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 40,
+  },
+  loadingText: {
+    fontSize: 16,
+    opacity: 0.7,
   },
 });

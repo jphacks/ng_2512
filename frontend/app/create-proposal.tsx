@@ -17,7 +17,13 @@ import { router } from "expo-router";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useUserId } from "@/hooks/use-user-id";
-import { apiClient, withUserId, User } from "@/services/api-client";
+import {
+  apiClient,
+  withUserId,
+  User,
+  generateAIProposal,
+  AIProposalData,
+} from "@/services/api-client";
 
 const { width: screenWidth } = Dimensions.get("window");
 
@@ -149,21 +155,41 @@ export default function CreateProposalScreen({
     onClose();
   };
 
-  const handleAIGenerate = () => {
+  const handleAIGenerate = async () => {
     if (!userId) {
       Alert.alert("エラー", "ユーザーIDが取得できません。");
       return;
     }
 
-    // AI生成のモック実装
-    // GET /api/proposal/ai with user_id
-    console.log("AI生成リクエスト:", { user_id: userId });
+    try {
+      console.log("AI生成リクエスト開始:", { user_id: userId });
 
-    setTitle("おしゃれなカフェでまったり時間");
-    setDatetime("2025年10月20日 14:00");
-    setLocation("表参道カフェ街");
-    setParticipantIds([1, 2]); // 最初の2人を自動選択
-    Alert.alert("AI生成完了", "AIがあなたの好みに合わせて提案を生成しました！");
+      const aiData = await generateAIProposal();
+
+      if (aiData) {
+        console.log("AI生成成功:", aiData);
+        setTitle(aiData.title);
+        setDatetime(aiData.event_date);
+        setLocation(aiData.location);
+
+        // participant_idsを数値配列に変換
+        const participantIds = aiData.participant_ids.map((id: string) =>
+          parseInt(id, 10)
+        );
+        setParticipantIds(participantIds);
+
+        Alert.alert(
+          "AI生成完了",
+          "AIがあなたの好みに合わせて提案を生成しました！"
+        );
+      } else {
+        console.error("AI生成失敗: データが空");
+        Alert.alert("エラー", "AI生成に失敗しました。もう一度お試しください。");
+      }
+    } catch (error) {
+      console.error("AI生成エラー:", error);
+      Alert.alert("エラー", "AI生成に失敗しました。もう一度お試しください。");
+    }
   };
 
   return (
