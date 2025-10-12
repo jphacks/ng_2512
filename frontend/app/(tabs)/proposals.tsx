@@ -18,7 +18,7 @@ import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import CreateProposalScreen from "../create-proposal";
 import { getUserId } from "@/utils/user-storage";
-import { apiClient, withUserId, Proposal } from "@/services/api-client";
+import { apiClient, getProposals, Proposal } from "@/services/api-client";
 
 const { width: screenWidth } = Dimensions.get("window");
 
@@ -39,14 +39,12 @@ export default function ProposalsScreen() {
   // 提案データを取得する関数
   const fetchProposals = async () => {
     try {
-      const result = await withUserId(async (userId) => {
-        return apiClient.get<Proposal[]>("/api/proposal", { user_id: userId });
-      });
+      const data = await getProposals();
 
-      if (result.data) {
-        setProposals(result.data);
+      if (data) {
+        setProposals(data);
       } else {
-        console.error("Failed to fetch proposals:", result.error);
+        console.error("Failed to fetch proposals");
       }
     } catch (error) {
       console.error("Error fetching proposals:", error);

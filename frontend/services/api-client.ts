@@ -1,7 +1,28 @@
 import { getUserId } from "@/utils/user-storage";
+import Constants from "expo-constants";
 
-// 環境変数からAPIエンドポイントを取得
-const API_BASE_URL = process.env.API_ENDPOINT || "https://api.example.com";
+// 環境変数からAPIエンドポイントを取得（優先順位: .env > app.json > デフォルト）
+const getApiBaseUrl = () => {
+  // 1. process.env（.envファイル）を最優先
+  if (process.env.EXPO_PUBLIC_API_ENDPOINT) {
+    return process.env.EXPO_PUBLIC_API_ENDPOINT;
+  }
+
+  // 2. app.jsonのextraフィールド
+  if (Constants.expoConfig?.extra?.apiEndpoint) {
+    return Constants.expoConfig.extra.apiEndpoint;
+  }
+
+  // 3. 旧形式のmanifest
+  if (Constants.manifest?.extra?.apiEndpoint) {
+    return Constants.manifest.extra.apiEndpoint;
+  }
+
+  // 4. デフォルト値
+  return "http://localhost:8000";
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 interface ApiResponse<T> {
   data?: T;
@@ -14,6 +35,20 @@ class ApiClient {
 
   constructor() {
     this.baseUrl = API_BASE_URL;
+    console.log("API Base URL:", this.baseUrl);
+    console.log("Environment variables check:");
+    console.log(
+      "- EXPO_PUBLIC_API_ENDPOINT:",
+      process.env.EXPO_PUBLIC_API_ENDPOINT
+    );
+    console.log(
+      "- Constants.expoConfig?.extra?.apiEndpoint:",
+      Constants.expoConfig?.extra?.apiEndpoint
+    );
+    console.log(
+      "- Constants.manifest?.extra?.apiEndpoint:",
+      Constants.manifest?.extra?.apiEndpoint
+    );
   }
 
   /**
@@ -34,6 +69,22 @@ class ApiClient {
       };
 
       console.log(`API Request: ${config.method || "GET"} ${url}`);
+
+      // ボディがある場合はその内容をログ出力
+      if (config.body) {
+        console.log("Request Body:", config.body);
+        // JSONとして解析可能な場合は整形して表示
+        try {
+          const parsedBody = JSON.parse(config.body as string);
+          console.log(
+            "Request Body (parsed):",
+            JSON.stringify(parsedBody, null, 2)
+          );
+        } catch (e) {
+          // JSON以外のボディの場合はそのまま表示
+          console.log("Request Body (raw):", config.body);
+        }
+      }
 
       const response = await fetch(url, config);
       const status = response.status;
@@ -126,6 +177,28 @@ class ApiClient {
       const url = `${this.baseUrl}${endpoint}`;
       console.log(`API File Upload: POST ${url}`);
 
+      // FormDataの内容をログ出力（React Native環境対応）
+      console.log("FormData body:", formData);
+      console.log("FormData type:", typeof formData);
+
+      // FormData._partsプロパティが存在する場合（React Native環境）
+      if ((formData as any)._parts) {
+        console.log("FormData parts:");
+        (formData as any)._parts.forEach(([key, value]: [string, any]) => {
+          if (value && typeof value === "object" && value.uri) {
+            // ファイルの場合
+            console.log(`  ${key}:`, {
+              name: value.name || "unknown",
+              type: value.type || "unknown",
+              uri: value.uri,
+            });
+          } else {
+            // 通常の値の場合
+            console.log(`  ${key}:`, value);
+          }
+        });
+      }
+
       const response = await fetch(url, {
         method: "POST",
         body: formData,
@@ -163,6 +236,24 @@ export const withUserId = async <T>(
     return { error: "User not authenticated", status: 401 };
   }
   return apiCall(userId);
+};
+
+// user_idをクエリパラメータに含めてAPIを呼び出すヘルパー関数
+export const withUserIdInQuery = async <T>(
+  endpoint: string,
+  additionalParams?: any
+): Promise<ApiResponse<T>> => {
+  const userId = await getUserId();
+  if (!userId) {
+    return { error: "User not authenticated", status: 401 };
+  }
+
+  const params = {
+    user_id: userId,
+    ...additionalParams,
+  };
+
+  return apiClient.get<T>(endpoint, params);
 };
 
 // 型定義
@@ -243,11 +334,29 @@ export interface NotificationData {
 
 // API呼び出し用のヘルパー関数
 export const getNotifications = async (): Promise<NotificationData | null> => {
-  const result = await withUserId(async (userId) => {
-    return apiClient.get<NotificationData>("/api/notification", {
-      user_id: userId,
-    });
-  });
+  const result = await withUserIdInQuery<NotificationData>("/api/notification");
+  return result.data || null;
+};
 
+// Proposal関連のAPI呼び出し
+export const getProposals = async (): Promise<Proposal[] | null> => {
+  const result = await withUserIdInQuery<Proposal[]>("/api/proposal");
+  return result.data || null;
+};
+
+// Friend関連のAPI呼び出し
+export const getFriends = async (): Promise<FriendData | null> => {
+  const result = await withUserIdInQuery<FriendData>("/api/friend");
+  return result.data || null;
+};
+
+export const searchFriends = async (
+  searchText: string
+): Promise<User[] | null> => {
+  console.log("searchFriends called with:", searchText);
+  const result = await apiClient.post<User[]>("/api/friend/search", {
+    input_text: searchText,
+  });
+  console.log("searchFriends result:", result);
   return result.data || null;
 };

@@ -15,16 +15,16 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Colors } from "@/constants/theme";
 import {
-  apiClient,
-  withUserId,
-  FriendData as ApiFriendData,
+  getFriends,
+  searchFriends,
   User,
+  FriendData,
 } from "@/services/api-client";
 
 export default function FriendsScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
-  const [friendData, setFriendData] = useState<ApiFriendData>({
+  const [friendData, setFriendData] = useState<FriendData>({
     friend: [],
     friend_requested: [],
     friend_recommended: [],
@@ -32,20 +32,19 @@ export default function FriendsScreen() {
     friend_blocked: [],
   });
   const [loading, setLoading] = useState(true);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchResults, setSearchResults] = useState<User[]>([]);
   const [showUserSearch, setShowUserSearch] = useState(false);
   const [showFriendRequests, setShowFriendRequests] = useState(false);
 
   // フレンドデータを取得する関数
   const fetchFriendData = async () => {
     try {
-      const result = await withUserId(async (userId) => {
-        return apiClient.get<ApiFriendData>("/api/friend", { user_id: userId });
-      });
-
-      if (result.data) {
-        setFriendData(result.data);
+      const data = await getFriends();
+      if (data) {
+        setFriendData(data);
       } else {
-        console.error("Failed to fetch friend data:", result.error);
+        console.error("Failed to fetch friend data");
       }
     } catch (error) {
       console.error("Error fetching friend data:", error);
@@ -139,10 +138,28 @@ export default function FriendsScreen() {
     );
   };
 
-  const handleSearch = () => {
+  const handleSearch = async () => {
+    console.log("handleSearch called with query:", searchQuery);
     if (searchQuery.trim()) {
-      // API呼び出し処理をここに実装
-      Alert.alert("検索", `"${searchQuery}" で検索しました`);
+      console.log("Starting search for:", searchQuery.trim());
+      setSearchLoading(true);
+      try {
+        const results = await searchFriends(searchQuery.trim());
+        console.log("Search results:", results);
+        if (results) {
+          setSearchResults(results);
+        } else {
+          setSearchResults([]);
+        }
+      } catch (error) {
+        console.error("Search failed:", error);
+        Alert.alert("エラー", "検索に失敗しました");
+        setSearchResults([]);
+      } finally {
+        setSearchLoading(false);
+      }
+    } else {
+      console.log("Search query is empty");
     }
   };
 
@@ -217,23 +234,47 @@ export default function FriendsScreen() {
                 styles.searchButton,
                 { backgroundColor: Colors.light.tint },
               ]}
-              onPress={handleSearch}
+              onPress={() => {
+                console.log("Search button pressed");
+                handleSearch();
+              }}
             >
               <Text style={styles.searchButtonText}>検索</Text>
             </TouchableOpacity>
           </View>
 
-          {/* Recommended Friends */}
+          {/* Search Results or Recommended Friends */}
           <View style={styles.sectionContainer}>
             <Text style={[styles.sectionTitle, { color: textColor }]}>
-              おすすめのユーザー
+              {searchQuery.trim() ? "検索結果" : "おすすめのユーザー"}
             </Text>
-            <FlatList
-              data={friendData.friend_recommended}
-              renderItem={renderFriend}
-              keyExtractor={(item) => item.user_id.toString()}
-              showsVerticalScrollIndicator={false}
-            />
+            {searchLoading ? (
+              <View style={styles.loadingContainer}>
+                <Text style={[styles.loadingText, { color: textColor }]}>
+                  検索中...
+                </Text>
+              </View>
+            ) : (
+              <FlatList
+                data={
+                  searchQuery.trim()
+                    ? searchResults
+                    : friendData.friend_recommended
+                }
+                renderItem={renderFriend}
+                keyExtractor={(item) => item.user_id.toString()}
+                showsVerticalScrollIndicator={false}
+                ListEmptyComponent={
+                  searchQuery.trim() ? (
+                    <View style={styles.emptyContainer}>
+                      <Text style={[styles.emptyText, { color: textColor }]}>
+                        検索結果が見つかりませんでした
+                      </Text>
+                    </View>
+                  ) : null
+                }
+              />
+            )}
           </View>
         </SafeAreaView>
       </Modal>
@@ -557,5 +598,22 @@ const styles = StyleSheet.create({
   blockedList: {
     flex: 1,
     paddingHorizontal: 16,
+  },
+  loadingContainer: {
+    padding: 20,
+    alignItems: "center",
+  },
+  loadingText: {
+    fontSize: 16,
+    opacity: 0.7,
+  },
+  emptyContainer: {
+    padding: 20,
+    alignItems: "center",
+  },
+  emptyText: {
+    fontSize: 16,
+    opacity: 0.7,
+    textAlign: "center",
   },
 });

@@ -13,6 +13,17 @@ export interface UserData {
 }
 
 /**
+ * ファイル拡張子からMIMEタイプを推定するヘルパー関数
+ */
+const getImageMimeType = (uri: string, originalType?: string): string => {
+  if (originalType && originalType.startsWith("image/")) return originalType;
+  if (uri.includes(".webp")) return "image/webp";
+  if (uri.includes(".png")) return "image/png";
+  if (uri.includes(".jpg") || uri.includes(".jpeg")) return "image/jpeg";
+  return "image/jpeg"; // デフォルト
+};
+
+/**
  * 保存されているユーザーIDを取得
  */
 export const getUserId = async (): Promise<number | null> => {
@@ -81,11 +92,16 @@ export const setSetupCompleted = async (): Promise<void> => {
 export const createUser = async (userData: {
   account_id: string;
   display_name: string;
-  icon_image?: any;
-  face_image?: any;
-  profile_text?: string;
+  icon_image?: any; // binary/null (オプショナル)
+  face_image: any; // binary (必須)
+  profile_text?: string; // string/null (オプショナル)
 }): Promise<number> => {
   try {
+    // face_imageは必須フィールドなのでチェック
+    if (!userData.face_image) {
+      throw new Error("face_image is required");
+    }
+
     const formData = new FormData();
     formData.append("account_id", userData.account_id);
     formData.append("display_name", userData.display_name);
@@ -95,20 +111,32 @@ export const createUser = async (userData: {
     }
 
     if (userData.icon_image) {
-      formData.append("icon_image", {
+      // React Native環境での正しいファイル形式
+      const iconImageFile = {
         uri: userData.icon_image.uri,
-        type: userData.icon_image.type || "image/jpeg",
-        name: "icon.jpg",
-      } as any);
+        type: getImageMimeType(
+          userData.icon_image.uri,
+          userData.icon_image.mimeType || userData.icon_image.type
+        ),
+        name:
+          userData.icon_image.fileName ||
+          userData.icon_image.name ||
+          "icon.jpg",
+      };
+      formData.append("icon_image", iconImageFile as any);
     }
 
-    if (userData.face_image) {
-      formData.append("face_image", {
-        uri: userData.face_image.uri,
-        type: userData.face_image.type || "image/jpeg",
-        name: "face.jpg",
-      } as any);
-    }
+    // face_imageは必須フィールド
+    const faceImageFile = {
+      uri: userData.face_image.uri,
+      type: getImageMimeType(
+        userData.face_image.uri,
+        userData.face_image.mimeType || userData.face_image.type
+      ),
+      name:
+        userData.face_image.fileName || userData.face_image.name || "face.jpg",
+    };
+    formData.append("face_image", faceImageFile as any);
 
     const result = await apiClient.postWithFile<{ user_id: number }>(
       "/api/user/create",
@@ -165,9 +193,9 @@ export const initializeUser = async (): Promise<{
 export const completeSetup = async (userData: {
   account_id: string;
   display_name: string;
-  icon_image?: any;
-  face_image?: any;
-  profile_text?: string;
+  icon_image?: any; // binary/null (オプショナル)
+  face_image: any; // binary (必須)
+  profile_text?: string; // string/null (オプショナル)
 }): Promise<number> => {
   try {
     // ユーザーを作成
