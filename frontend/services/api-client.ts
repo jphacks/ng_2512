@@ -214,7 +214,7 @@ export interface ChatMessage {
 }
 
 export interface Album {
-  albam_id: number;
+  album_id: number;
   title: string;
   last_uploaded_image_url: string;
   image_num: number;
