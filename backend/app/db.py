@@ -811,6 +811,14 @@ def fetch_ai_proposal_suggestion(session: Session, user_id: int) -> AIProposalSu
 # --- Chat queries ----------------------------------------------------------
 
 
+def _ensure_timezone(dt: datetime | None) -> datetime | None:
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
 def fetch_chat_groups(session: Session, user_id: int) -> list[ChatGroupSummary]:
     """Return chat groups for the user with unread counts."""
     memberships = session.execute(
@@ -847,7 +855,7 @@ def fetch_chat_groups(session: Session, user_id: int) -> list[ChatGroupSummary]:
                 last_content = "[image]"
             else:
                 last_content = ""
-            last_date = last_message.posted_at
+            last_date = _ensure_timezone(last_message.posted_at)
         else:
             last_content = ""
             last_date = None
@@ -863,10 +871,8 @@ def fetch_chat_groups(session: Session, user_id: int) -> list[ChatGroupSummary]:
             )
         )
 
-    summaries.sort(
-        key=lambda item: item.last_message_date or datetime.min.replace(tzinfo=timezone.utc),
-        reverse=True,
-    )
+    tz_min = datetime.min.replace(tzinfo=timezone.utc)
+    summaries.sort(key=lambda item: item.last_message_date or tz_min, reverse=True)
     return summaries
 
 

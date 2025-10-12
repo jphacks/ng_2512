@@ -130,6 +130,7 @@ class ChatSummaryResponse(BaseModel):
 class ChatGroupCreateRequest(BaseModel):
     title: str
     member_ids: List[int]
+    creator_id: int
 
     @field_validator("member_ids", mode="before")
     @classmethod
@@ -142,9 +143,25 @@ class ChatGroupCreateRequest(BaseModel):
                 members.append(int(item))
             except (TypeError, ValueError) as exc:
                 raise ValueError("member_ids must contain integers.") from exc
-        if not members:
-            raise ValueError("member_ids must not be empty.")
         return members
+
+    @field_validator("creator_id", mode="before")
+    @classmethod
+    def convert_creator(cls, value: object) -> int:
+        try:
+            return int(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("creator_id must be an integer.") from exc
+
+    def all_participants(self) -> List[int]:
+        seen: set[int] = set()
+        ordered: list[int] = []
+        for candidate in [self.creator_id, *self.member_ids]:
+            if candidate in seen:
+                continue
+            seen.add(candidate)
+            ordered.append(candidate)
+        return ordered
 
 
 class ChatMemberInviteRequest(BaseModel):
@@ -416,7 +433,7 @@ def create_app() -> FastAPI:
             group_id = db.create_chat_group(
                 session,
                 title=payload.title,
-                member_ids=payload.member_ids,
+                member_ids=payload.all_participants(),
             )
         except SQLAlchemyError as exc:  # pragma: no cover - defensive
             raise HTTPException(
