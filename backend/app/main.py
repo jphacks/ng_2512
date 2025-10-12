@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import List
 
-from fastapi import Body, Depends, FastAPI, HTTPException, Path, Query, status, UploadFile, File
+from fastapi import Body, Depends, FastAPI, HTTPException, Path, Query, status, UploadFile, File, Form
 from pydantic import BaseModel, Field, field_validator, model_validator
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -684,7 +684,7 @@ def create_app() -> FastAPI:
             ) from exc
         return CreateUserResponse(user_id=user_id)
 
-    @app.put("/api/user", status_code=status.HTTP_204_NO_CONTENT, tags=["user"])
+    @app.put("/api/user", status_code=status.HTTP_200_OK, tags=["user"])
     async def update_user(
         user_id: int = Form(...),
         account_id: str = Form(...),

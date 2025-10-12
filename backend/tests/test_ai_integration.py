@@ -44,26 +44,48 @@ def test_healthcheck():
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
 
-def test_ai_proposal_endpoint():
-    """Test the AI proposal endpoint. Expects a successful response."""
-    # The AI_SERVER_URL must be set for this test to pass
+def test_ai_proposal_endpoint(mocker):
+    """Test the AI proposal endpoint with a mocked AI service."""
+    # Mock the AI service to avoid actual HTTP requests
+    mocker.patch(
+        "app.ai_service.get_ai_proposal_suggestion",
+        return_value={
+            "title": "Mocked Proposal",
+            "event_date": "2025-12-25T12:00:00Z",
+            "location": "Virtual",
+            "participant_ids": [1, 2],
+        },
+    )
+
     response = client.get("/api/proposal/ai?user_id=1")
     assert response.status_code == 200
     data = response.json()
-    assert "title" in data
+    assert data["title"] == "Mocked Proposal"
     assert "event_date" in data
-    assert data["title"] is not None
 
-def test_face_matching_endpoint(face_image_path: Path):
-    """Test the face matching endpoint with a dummy image."""
-    # The AI_SERVER_URL must be set for this test to pass
+def test_face_matching_endpoint(mocker, face_image_path: Path):
+    """Test the face matching endpoint with a mocked AI service and DB."""
+    # Mock the AI service to avoid actual HTTP requests
+    mocker.patch(
+        "app.ai_service.generate_embedding_from_image",
+        return_value=[0.1] * 128,  # Dummy embedding
+    )
+
+    # Mock the DB function to avoid DB queries
+    mock_user = mocker.Mock()
+    mock_user.id = 1
+    mock_user.display_name = "Test User"
+    mocker.patch(
+        "app.db.find_user_by_face_embedding",
+        return_value=(mock_user, 0.95),  # Dummy user and confidence
+    )
+
     with open(face_image_path, "rb") as f:
         files = {"file": (face_image_path.name, f, "image/jpeg")}
         response = client.post("/api/user/match-face", files=files)
-    
-    # This endpoint connects to the AI server, which might not find a match
-    # in the test DB. We are primarily testing for a successful connection and valid response format.
+
     assert response.status_code == 200
     data = response.json()
-    assert "user_id" in data
-    assert "match_confidence" in data
+    assert data["user_id"] == 1
+    assert data["display_name"] == "Test User"
+    assert data["match_confidence"] == 0.95
