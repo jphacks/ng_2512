@@ -10,10 +10,12 @@ dependencies = [
     "gunicorn==21.2.0",
     "httpx>=0.28.1",
     "python-multipart>=0.0.9",
+    "python-dotenv>=1.0.1",
     "pgvector==0.2.5",
     "psycopg[binary]==3.1.19",
     "pytest==8.3.3",
     "sqlalchemy==2.0.32",
     "uvicorn==0.30.6",
     "pillow>=11.3.0",
+    "pymysql>=1.1.2",
 ]
