@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -15,12 +15,12 @@ import { useLocalSearchParams, router } from "expo-router";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Colors } from "@/constants/theme";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { getAlbumImages, AlbumImage } from "@/services/api-client";
+import { useUserId } from "@/hooks/use-user-id";
 import * as ImagePicker from "expo-image-picker";
 
-interface Photo {
-  id: string;
-  uri: string;
-  isSelected: boolean;
+interface Photo extends AlbumImage {
+  isSelected?: boolean;
   isUploading?: boolean;
 }
 
@@ -33,80 +33,65 @@ interface User {
 
 export default function AlbumDetailScreen() {
   const { id } = useLocalSearchParams();
+  const { userId } = useUserId();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
 
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [activeTab, setActiveTab] = useState<"title" | "sharing">("sharing");
   const [selectionMode, setSelectionMode] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  // Sample album data
-  const albumTitle = "夏の思い出";
-  const albumSubtitle = "12枚 • 3人で共有";
+  // アルバム情報
+  const [albumTitle, setAlbumTitle] = useState("アルバム");
+  const [albumSubtitle, setAlbumSubtitle] = useState("読み込み中...");
 
-  // Sample photos data
-  const [photos, setPhotos] = useState<Photo[]>([
-    {
-      id: "1",
-      uri: "https://picsum.photos/200/200?random=1",
-      isSelected: false,
-    },
-    {
-      id: "2",
-      uri: "https://picsum.photos/200/200?random=2",
-      isSelected: false,
-    },
-    {
-      id: "3",
-      uri: "https://picsum.photos/200/200?random=3",
-      isSelected: false,
-    },
-    {
-      id: "4",
-      uri: "https://picsum.photos/200/200?random=4",
-      isSelected: false,
-    },
-    {
-      id: "5",
-      uri: "https://picsum.photos/200/200?random=5",
-      isSelected: false,
-    },
-    {
-      id: "6",
-      uri: "https://picsum.photos/200/200?random=6",
-      isSelected: false,
-    },
-    {
-      id: "7",
-      uri: "https://picsum.photos/200/200?random=7",
-      isSelected: false,
-    },
-    {
-      id: "8",
-      uri: "https://picsum.photos/200/200?random=8",
-      isSelected: false,
-    },
-    {
-      id: "9",
-      uri: "https://picsum.photos/200/200?random=9",
-      isSelected: false,
-    },
-    {
-      id: "10",
-      uri: "https://picsum.photos/200/200?random=10",
-      isSelected: false,
-    },
-    {
-      id: "11",
-      uri: "https://picsum.photos/200/200?random=11",
-      isSelected: false,
-    },
-    {
-      id: "12",
-      uri: "https://picsum.photos/200/200?random=12",
-      isSelected: false,
-    },
-  ]);
+  // APIから取得する写真データ
+  const [photos, setPhotos] = useState<Photo[]>([]);
+
+  // アルバムの写真データを取得する関数
+  const fetchAlbumImages = async () => {
+    if (!id || Array.isArray(id)) {
+      console.error("Invalid album ID:", id);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const albumId = parseInt(id, 10);
+      const data = await getAlbumImages(albumId);
+
+      console.log("Album images API response:", data);
+
+      if (data) {
+        // データを正規化してPhoto型に変換
+        const normalizedPhotos: Photo[] = data.map((image) => ({
+          ...image,
+          isSelected: false,
+          isUploading: false,
+        }));
+
+        setPhotos(normalizedPhotos);
+
+        // アルバム情報を更新
+        const photoCount = normalizedPhotos.length;
+        const sharedUserCount = 1; // TODO: 共有ユーザー数をAPIから取得
+        setAlbumSubtitle(`${photoCount}枚 • ${sharedUserCount}人で共有`);
+      } else {
+        console.error("Failed to fetch album images");
+        setPhotos([]);
+      }
+    } catch (error) {
+      console.error("Error fetching album images:", error);
+      setPhotos([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAlbumImages();
+  }, [id]);
 
   // Sample users data
   const [users, setUsers] = useState<User[]>([
@@ -129,20 +114,20 @@ export default function AlbumDetailScreen() {
 
   const selectedUserCount = users.filter((user) => user.isSelected).length;
 
-  const handlePhotoPress = (photoId: string) => {
+  const handlePhotoPress = (photoId: number) => {
     if (selectionMode) {
       setPhotos((prev) =>
         prev.map((photo) =>
-          photo.id === photoId
+          photo.image_id === photoId
             ? { ...photo, isSelected: !photo.isSelected }
             : photo
         )
       );
     } else {
       // 写真の全体表示
-      const photo = photos.find((p) => p.id === photoId);
+      const photo = photos.find((p) => p.image_id === photoId);
       if (photo) {
-        setSelectedPhotoUri(photo.uri);
+        setSelectedPhotoUri(photo.image_url);
         setShowPhotoModal(true);
       }
     }
@@ -181,15 +166,13 @@ export default function AlbumDetailScreen() {
 
         result = await ImagePicker.launchCameraAsync({
           mediaTypes: ImagePicker.MediaTypeOptions.Images,
-          allowsEditing: true,
-          aspect: [1, 1],
+          allowsEditing: false,
           quality: 0.8,
         });
       } else {
         result = await ImagePicker.launchImageLibraryAsync({
           mediaTypes: ImagePicker.MediaTypeOptions.Images,
-          allowsEditing: true,
-          aspect: [1, 1],
+          allowsEditing: false,
           quality: 0.8,
           allowsMultipleSelection: true,
         });
@@ -200,8 +183,9 @@ export default function AlbumDetailScreen() {
 
         // アップロード中の写真を即座に表示
         const newUploadingPhotos = result.assets.map((asset, index) => ({
-          id: `uploading_${Date.now()}_${index}`,
-          uri: asset.uri,
+          image_id: Date.now() + index,
+          image_url: asset.uri,
+          is_creator: true,
           isSelected: false,
           isUploading: true,
         }));
@@ -213,8 +197,9 @@ export default function AlbumDetailScreen() {
           setTimeout(() => {
             const uploadedPhoto = {
               ...newUploadingPhotos[i],
-              id: `uploaded_${Date.now()}_${i}`,
+              image_id: Date.now() + i,
               isUploading: false,
+              is_creator: true,
             };
 
             // アップロード完了した写真を写真リストに追加
@@ -222,7 +207,9 @@ export default function AlbumDetailScreen() {
 
             // アップロード中リストから削除
             setUploadingPhotos((prev) =>
-              prev.filter((photo) => photo.id !== newUploadingPhotos[i].id)
+              prev.filter(
+                (photo) => photo.image_id !== newUploadingPhotos[i].image_id
+              )
             );
 
             // 最後の写真のアップロードが完了したら通知
@@ -263,10 +250,10 @@ export default function AlbumDetailScreen() {
           marginLeft: index % 3 === 0 ? 0 : 8,
         },
       ]}
-      onPress={() => handlePhotoPress(item.id)}
+      onPress={() => handlePhotoPress(item.image_id)}
       disabled={item.isUploading}
     >
-      <Image source={{ uri: item.uri }} style={styles.photo} />
+      <Image source={{ uri: item.image_url }} style={styles.photo} />
 
       {/* アップロード中のオーバーレイ */}
       {item.isUploading && (
@@ -338,14 +325,22 @@ export default function AlbumDetailScreen() {
       </View>
 
       {/* Photo Grid */}
-      <FlatList
-        data={[...uploadingPhotos, ...photos]}
-        renderItem={renderPhoto}
-        numColumns={3}
-        contentContainerStyle={styles.photoGrid}
-        showsVerticalScrollIndicator={false}
-        keyExtractor={(item) => item.id}
-      />
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <Text style={[styles.loadingText, { color: colors.text }]}>
+            読み込み中...
+          </Text>
+        </View>
+      ) : (
+        <FlatList
+          data={[...uploadingPhotos, ...photos]}
+          renderItem={renderPhoto}
+          numColumns={3}
+          contentContainerStyle={styles.photoGrid}
+          showsVerticalScrollIndicator={false}
+          keyExtractor={(item) => item.image_id.toString()}
+        />
+      )}
 
       {/* Settings Modal */}
       <Modal
@@ -1031,5 +1026,15 @@ const styles = StyleSheet.create({
   photoModalImage: {
     width: "100%",
     height: "100%",
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 40,
+  },
+  loadingText: {
+    fontSize: 16,
+    opacity: 0.7,
   },
 });

@@ -10,30 +10,23 @@ import {
   Animated,
   Dimensions,
   Modal,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { router } from "expo-router";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useUserId } from "@/hooks/use-user-id";
+import {
+  apiClient,
+  withUserId,
+  User,
+  generateAIProposal,
+  AIProposalData,
+} from "@/services/api-client";
 
 const { width: screenWidth } = Dimensions.get("window");
-
-interface Friend {
-  id: string;
-  name: string;
-  avatar?: string;
-}
-
-// モックフレンドデータ
-const mockFriends: Friend[] = [
-  { id: "1", name: "田中太郎" },
-  { id: "2", name: "佐藤花子" },
-  { id: "3", name: "鈴木一郎" },
-  { id: "4", name: "山田美香" },
-  { id: "5", name: "高橋健太" },
-  { id: "6", name: "渡辺さくら" },
-];
 
 interface CreateProposalProps {
   visible: boolean;
@@ -44,15 +37,66 @@ export default function CreateProposalScreen({
   visible,
   onClose,
 }: CreateProposalProps) {
+  const { userId } = useUserId();
   const [title, setTitle] = useState("");
-  const [datetime, setDatetime] = useState("");
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [location, setLocation] = useState("");
-  const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
+  const [selectedFriends, setSelectedFriends] = useState<number[]>([]);
+  const [friends, setFriends] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+
+  // フレンド一覧を取得
+  const fetchFriends = async () => {
+    try {
+      const result = await withUserId(async (userId) => {
+        return apiClient.get<any>("/api/friend", { user_id: userId });
+      });
+
+      if (result.data?.friend) {
+        setFriends(result.data.friend);
+      } else {
+        console.error("Failed to fetch friends:", result.error);
+      }
+    } catch (error) {
+      console.error("Error fetching friends:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (visible) {
+      fetchFriends();
+    }
+  }, [visible]);
+
+  const [participant_ids, setParticipantIds] = useState<number[]>([]);
   const [fadeAnim] = useState(new Animated.Value(0));
   const [slideAnim] = useState(new Animated.Value(50));
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
+
+  // 日付フォーマット用のヘルパー関数
+  const formatDate = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    const hours = String(date.getHours()).padStart(2, "0");
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+    return `${year}-${month}-${day}T${hours}:${minutes}:00`;
+  };
+
+  // 日付表示用のヘルパー関数
+  const formatDisplayDate = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    const hours = String(date.getHours()).padStart(2, "0");
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+    return `${year}年${month}月${day}日 ${hours}:${minutes}`;
+  };
 
   useEffect(() => {
     Animated.parallel([
@@ -69,51 +113,128 @@ export default function CreateProposalScreen({
     ]).start();
   }, []);
 
-  const filteredFriends = mockFriends.filter((friend) =>
-    friend.name.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredFriends = friends.filter((friend: User) =>
+    friend.display_name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const toggleFriendSelection = (friendId: string) => {
-    setSelectedFriends((prev) =>
-      prev.includes(friendId)
-        ? prev.filter((id) => id !== friendId)
-        : [...prev, friendId]
+  const toggleFriendSelection = (friendUserId: number) => {
+    setParticipantIds((prev) =>
+      prev.includes(friendUserId)
+        ? prev.filter((id) => id !== friendUserId)
+        : [...prev, friendUserId]
     );
   };
 
-  const handleCreate = () => {
-    if (
-      !title.trim() ||
-      !datetime.trim() ||
-      !location.trim() ||
-      selectedFriends.length === 0
-    ) {
+  const handleCreate = async () => {
+    if (!title.trim() || !location.trim() || participant_ids.length === 0) {
       Alert.alert("エラー", "すべての項目を入力してください。");
       return;
     }
 
-    Alert.alert("成功", "提案が作成されました！", [
-      {
-        text: "OK",
-        onPress: () => {
-          // ここで実際の作成処理を行う
-          onClose();
+    if (!userId) {
+      Alert.alert("エラー", "ユーザーIDが取得できません。");
+      return;
+    }
+
+    try {
+      // 自身のuser_idを含めたparticipant_idsを作成
+      const allParticipantIds = [...participant_ids, userId];
+
+      console.log("提案作成リクエスト:", {
+        user_id: userId,
+        title: title.trim(),
+        event_date: formatDate(selectedDate),
+        location: location.trim(),
+        participant_ids: allParticipantIds.map((id) => id.toString()),
+      });
+
+      const result = await apiClient.post("/api/proposal", {
+        user_id: userId,
+        title: title.trim(),
+        event_date: formatDate(selectedDate),
+        location: location.trim(),
+        participant_ids: allParticipantIds.map((id) => id.toString()),
+      });
+
+      console.log("提案作成レスポンス:", result);
+
+      if (result.error) {
+        console.error("提案作成エラー:", result.error);
+        Alert.alert("エラー", "提案の作成に失敗しました");
+        return;
+      }
+
+      Alert.alert("成功", "提案が作成されました！", [
+        {
+          text: "OK",
+          onPress: () => {
+            setTitle("");
+            setSelectedDate(new Date());
+            setLocation("");
+            setParticipantIds([]);
+            onClose();
+          },
         },
-      },
-    ]);
+      ]);
+    } catch (error) {
+      console.error("Error creating proposal:", error);
+      Alert.alert("エラー", "提案の作成に失敗しました");
+    }
   };
 
   const closeModal = () => {
     onClose();
   };
 
-  const handleAIGenerate = () => {
-    // AI生成のモック実装
-    setTitle("おしゃれなカフェでまったり時間");
-    setDatetime("2025年10月20日 14:00");
-    setLocation("表参道カフェ街");
-    setSelectedFriends(["1", "2"]); // 最初の2人を自動選択
-    Alert.alert("AI生成完了", "AIがあなたの好みに合わせて提案を生成しました！");
+  const handleAIGenerate = async () => {
+    if (!userId) {
+      Alert.alert("エラー", "ユーザーIDが取得できません。");
+      return;
+    }
+
+    try {
+      console.log("AI生成リクエスト開始:", { user_id: userId });
+
+      const aiData = await generateAIProposal();
+
+      if (aiData) {
+        console.log("AI生成成功:", aiData);
+        setTitle(aiData.title);
+
+        // event_dateをDateオブジェクトに変換
+        try {
+          const eventDate = new Date(aiData.event_date);
+          setSelectedDate(eventDate);
+        } catch (error) {
+          console.error("日付の解析に失敗:", error);
+          // デフォルトで現在時刻を設定
+          setSelectedDate(new Date());
+        }
+
+        setLocation(aiData.location);
+
+        // participant_idsを数値配列に変換し、自身のuser_idを含める
+        const participantIds = aiData.participant_ids.map((id: string) =>
+          parseInt(id, 10)
+        );
+        // 自身のuser_idが含まれていない場合は追加
+        if (!participantIds.includes(userId)) {
+          participantIds.push(userId);
+        }
+        setParticipantIds(participantIds);
+
+        Alert.alert(
+          "AI生成完了",
+          "AIがあなたの好みに合わせて提案を生成しました！"
+        );
+      } else {
+        console.error("AI生成失敗: データが空");
+        Alert.alert("エラー", "AI生成に失敗しました。もう一度お試しください。");
+      }
+    } catch (error) {
+      console.error("AI生成エラー:", error);
+      Alert.alert("エラー", "AI生成に失敗しました。もう一度お試しください。");
+    }
   };
 
   return (
@@ -201,20 +322,22 @@ export default function CreateProposalScreen({
                 <IconSymbol name="calendar" size={20} color={colors.accent} />{" "}
                 日時候補
               </Text>
-              <TextInput
+              <TouchableOpacity
                 style={[
-                  styles.textInput,
+                  styles.datePickerButton,
                   {
                     backgroundColor: colors.surfaceSecondary,
                     borderColor: colors.border,
-                    color: colors.text,
                   },
                 ]}
-                value={datetime}
-                onChangeText={setDatetime}
-                placeholder="例: 10月15日 14:00〜"
-                placeholderTextColor={colors.placeholder}
-              />
+                onPress={() => setShowDatePicker(true)}
+              >
+                <IconSymbol name="calendar" size={16} color={colors.text} />
+                <Text style={[styles.datePickerText, { color: colors.text }]}>
+                  {formatDisplayDate(selectedDate)}
+                </Text>
+                <IconSymbol name="chevron.down" size={16} color={colors.text} />
+              </TouchableOpacity>
             </View>
 
             <View
@@ -282,9 +405,9 @@ export default function CreateProposalScreen({
                 placeholderTextColor={colors.placeholder}
               />
               <View style={styles.friendsList}>
-                {filteredFriends.map((friend) => (
+                {filteredFriends.map((friend: User) => (
                   <TouchableOpacity
-                    key={friend.id}
+                    key={friend.user_id}
                     style={[
                       styles.friendItem,
                       {
@@ -292,7 +415,7 @@ export default function CreateProposalScreen({
                         borderColor: colors.border,
                       },
                     ]}
-                    onPress={() => toggleFriendSelection(friend.id)}
+                    onPress={() => toggleFriendSelection(friend.user_id)}
                     activeOpacity={0.7}
                   >
                     <View style={styles.friendInfo}>
@@ -303,27 +426,27 @@ export default function CreateProposalScreen({
                         ]}
                       >
                         <Text style={styles.avatarText}>
-                          {friend.name.charAt(0)}
+                          {friend.display_name.charAt(0)}
                         </Text>
                       </View>
                       <Text style={[styles.friendName, { color: colors.text }]}>
-                        {friend.name}
+                        {friend.display_name}
                       </Text>
                     </View>
                     <View
                       style={[
                         styles.checkbox,
                         {
-                          borderColor: selectedFriends.includes(friend.id)
+                          borderColor: participant_ids.includes(friend.user_id)
                             ? colors.primary
                             : colors.border,
                         },
-                        selectedFriends.includes(friend.id) && {
+                        participant_ids.includes(friend.user_id) && {
                           backgroundColor: colors.primary,
                         },
                       ]}
                     >
-                      {selectedFriends.includes(friend.id) && (
+                      {participant_ids.includes(friend.user_id) && (
                         <IconSymbol name="checkmark" size={16} color="#fff" />
                       )}
                     </View>
@@ -333,21 +456,23 @@ export default function CreateProposalScreen({
             </View>
           </Animated.View>
 
-          {selectedFriends.length > 0 && (
+          {participant_ids.length > 0 && (
             <View style={styles.selectedSection}>
               <Text style={styles.selectedTitle}>
-                選択された参加者 ({selectedFriends.length}人)
+                選択された参加者 ({participant_ids.length}人)
               </Text>
               <View style={styles.selectedFriends}>
-                {selectedFriends.map((friendId) => {
-                  const friend = mockFriends.find((f) => f.id === friendId);
+                {participant_ids.map((friendUserId) => {
+                  const friend = friends.find(
+                    (f: User) => f.user_id === friendUserId
+                  );
                   return (
-                    <View key={friendId} style={styles.selectedFriend}>
+                    <View key={friendUserId} style={styles.selectedFriend}>
                       <Text style={styles.selectedFriendName}>
-                        {friend?.name}
+                        {friend?.display_name}
                       </Text>
                       <TouchableOpacity
-                        onPress={() => toggleFriendSelection(friendId)}
+                        onPress={() => toggleFriendSelection(friendUserId)}
                       >
                         <IconSymbol name="xmark" size={16} color="#666" />
                       </TouchableOpacity>
@@ -371,6 +496,149 @@ export default function CreateProposalScreen({
           </TouchableOpacity>
         </View>
       </SafeAreaView>
+
+      {/* Date Picker Modal */}
+      {showDatePicker && (
+        <Modal
+          visible={showDatePicker}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => setShowDatePicker(false)}
+        >
+          <View style={styles.datePickerModalOverlay}>
+            <View
+              style={[
+                styles.datePickerModal,
+                { backgroundColor: colors.background },
+              ]}
+            >
+              <View style={styles.datePickerHeader}>
+                <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                  <Text
+                    style={[styles.datePickerButton, { color: colors.text }]}
+                  >
+                    キャンセル
+                  </Text>
+                </TouchableOpacity>
+                <Text style={[styles.datePickerTitle, { color: colors.text }]}>
+                  日時を選択
+                </Text>
+                <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                  <Text
+                    style={[styles.datePickerButton, { color: colors.primary }]}
+                  >
+                    完了
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.datePickerContent}>
+                <Text style={[styles.datePickerLabel, { color: colors.text }]}>
+                  日付を選択してください
+                </Text>
+                <View style={styles.dateTimePickerContainer}>
+                  <TouchableOpacity
+                    style={[
+                      styles.dateTimeButton,
+                      { backgroundColor: colors.surface },
+                    ]}
+                    onPress={() => {
+                      // 簡易的な日付選択（実際の実装では外部ライブラリを使用）
+                      const tomorrow = new Date();
+                      tomorrow.setDate(tomorrow.getDate() + 1);
+                      setSelectedDate(tomorrow);
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.dateTimeButtonText,
+                        { color: colors.text },
+                      ]}
+                    >
+                      明日
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.dateTimeButton,
+                      { backgroundColor: colors.surface },
+                    ]}
+                    onPress={() => {
+                      const nextWeek = new Date();
+                      nextWeek.setDate(nextWeek.getDate() + 7);
+                      setSelectedDate(nextWeek);
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.dateTimeButtonText,
+                        { color: colors.text },
+                      ]}
+                    >
+                      来週
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.dateTimeButton,
+                      { backgroundColor: colors.surface },
+                    ]}
+                    onPress={() => {
+                      const nextWeekend = new Date();
+                      const daysUntilWeekend = 6 - nextWeekend.getDay();
+                      nextWeekend.setDate(
+                        nextWeekend.getDate() + daysUntilWeekend
+                      );
+                      setSelectedDate(nextWeekend);
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.dateTimeButtonText,
+                        { color: colors.text },
+                      ]}
+                    >
+                      今度の土曜日
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.timePickerContainer}>
+                  <Text
+                    style={[styles.timePickerLabel, { color: colors.text }]}
+                  >
+                    時間を選択
+                  </Text>
+                  <View style={styles.timeButtons}>
+                    {["10:00", "14:00", "18:00", "19:00"].map((time) => (
+                      <TouchableOpacity
+                        key={time}
+                        style={[
+                          styles.timeButton,
+                          { backgroundColor: colors.surface },
+                        ]}
+                        onPress={() => {
+                          const [hours, minutes] = time.split(":").map(Number);
+                          const newDate = new Date(selectedDate);
+                          newDate.setHours(hours, minutes, 0, 0);
+                          setSelectedDate(newDate);
+                        }}
+                      >
+                        <Text
+                          style={[
+                            styles.timeButtonText,
+                            { color: colors.text },
+                          ]}
+                        >
+                          {time}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
     </Modal>
   );
 }
@@ -572,5 +840,96 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 16,
     fontWeight: "600",
+  },
+  // Date Picker Styles
+  datePickerButton: {
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#ddd",
+    marginBottom: 16,
+    flexDirection: "row",
+    backgroundColor: "#f9f9f9",
+  },
+  datePickerText: {
+    fontSize: 16,
+    marginLeft: 8,
+  },
+  datePickerModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "flex-end",
+  },
+  datePickerModal: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    maxHeight: "80%",
+  },
+  datePickerHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+  },
+  datePickerTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+  datePickerContent: {
+    paddingVertical: 20,
+  },
+  datePickerLabel: {
+    fontSize: 16,
+    fontWeight: "600",
+    marginBottom: 16,
+  },
+  dateTimePickerContainer: {
+    marginBottom: 24,
+  },
+  dateTimeButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginRight: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#ddd",
+  },
+  dateTimeButtonText: {
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  timePickerContainer: {
+    marginTop: 16,
+  },
+  timePickerLabel: {
+    fontSize: 16,
+    fontWeight: "600",
+    marginBottom: 12,
+  },
+  timeButtons: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  timeButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "#ddd",
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  timeButtonText: {
+    fontSize: 14,
+    fontWeight: "500",
   },
 });

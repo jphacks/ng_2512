@@ -16,67 +16,66 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 
-interface Message {
-  id: string;
-  text: string;
-  sender: string;
-  timestamp: Date;
-  isOwn: boolean;
-}
+import { apiClient, withUserId, ChatMessage } from "@/services/api-client";
+import { getUserId } from "@/utils/user-storage";
 
-// モックメッセージデータ
-const mockMessages: { [key: string]: Message[] } = {
-  "1": [
-    {
-      id: "1",
-      text: "こんにちは！映画の件、どうでしたか？",
-      sender: "田中さん",
-      timestamp: new Date("2025-10-11T14:30:00"),
-      isOwn: false,
-    },
-    {
-      id: "2",
-      text: "新宿の映画館で14時からはどうですか？",
-      sender: "田中さん",
-      timestamp: new Date("2025-10-11T14:31:00"),
-      isOwn: false,
-    },
-    {
-      id: "3",
-      text: "いいですね！参加します😊",
-      sender: "あなた",
-      timestamp: new Date("2025-10-11T14:32:00"),
-      isOwn: true,
-    },
-  ],
-  "2": [
-    {
-      id: "4",
-      text: "みんな明日の14時で大丈夫？",
-      sender: "佐藤さん",
-      timestamp: new Date("2025-10-11T12:15:00"),
-      isOwn: false,
-    },
-    {
-      id: "5",
-      text: "はい、大丈夫です！",
-      sender: "あなた",
-      timestamp: new Date("2025-10-11T12:16:00"),
-      isOwn: true,
-    },
-  ],
-};
+interface Message extends ChatMessage {
+  isOwn: boolean; // フロントエンド用の追加プロパティ
+}
 
 export default function ChatDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const [messages, setMessages] = useState<Message[]>(
-    mockMessages[id || "1"] || []
-  );
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
   const [inputText, setInputText] = useState("");
   const [fadeAnim] = useState(new Animated.Value(0));
   const flatListRef = useRef<FlatList>(null);
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
+
+  useEffect(() => {
+    initializeData();
+  }, [id]);
+
+  const initializeData = async () => {
+    try {
+      const userId = await getUserId();
+      if (!userId) {
+        router.back();
+        return;
+      }
+
+      setCurrentUserId(userId);
+      await fetchMessages();
+    } catch (error) {
+      console.error("初期化エラー:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchMessages = async () => {
+    try {
+      if (!id) return;
+
+      const response = await withUserId((userId) =>
+        apiClient.get<ChatMessage[]>(`/api/chat/${id}`)
+      );
+
+      if (response.data) {
+        // isOwnプロパティを追加
+        const messagesWithOwnership = response.data.map((msg: ChatMessage) => ({
+          ...msg,
+          isOwn: msg.sender_id === currentUserId,
+        }));
+
+        setMessages(messagesWithOwnership);
+      }
+    } catch (error) {
+      console.error("メッセージ取得エラー:", error);
+    }
+  };
 
   // チャット情報を取得（実際のアプリでは API から取得）
   const getChatInfo = () => {
@@ -111,26 +110,40 @@ export default function ChatDetailScreen() {
     }, 100);
   }, [messages]);
 
-  const sendMessage = () => {
-    if (inputText.trim()) {
-      const newMessage: Message = {
-        id: Date.now().toString(),
-        text: inputText.trim(),
-        sender: "あなた",
-        timestamp: new Date(),
-        isOwn: true,
-      };
-      setMessages([...messages, newMessage]);
-      setInputText("");
+  const sendMessage = async () => {
+    if (!inputText.trim() || !currentUserId || !id) return;
 
-      // 新しいメッセージを送信後、最下部にスクロール
-      setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
-      }, 100);
+    try {
+      const messageData = {
+        body: inputText.trim(),
+        image_url: "",
+      };
+
+      const response = await withUserId((userId) =>
+        apiClient.post<ChatMessage>(`/api/chat/${id}`, messageData)
+      );
+
+      if (response.data) {
+        // 送信したメッセージをローカルに追加
+        const newMessage: Message = {
+          ...response.data,
+          isOwn: true,
+        };
+        setMessages((prev) => [...prev, newMessage]);
+        setInputText("");
+
+        // 新しいメッセージを送信後、最下部にスクロール
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+      }
+    } catch (error) {
+      console.error("メッセージ送信エラー:", error);
     }
   };
 
-  const formatTime = (date: Date) => {
+  const formatTime = (dateString: string) => {
+    const date = new Date(dateString);
     return `${date.getHours()}:${date
       .getMinutes()
       .toString()
@@ -139,7 +152,7 @@ export default function ChatDetailScreen() {
 
   const renderMessage = ({ item, index }: { item: Message; index: number }) => {
     const showSender =
-      index === 0 || messages[index - 1].sender !== item.sender;
+      index === 0 || messages[index - 1].sender_name !== item.sender_name;
 
     return (
       <View
@@ -150,7 +163,7 @@ export default function ChatDetailScreen() {
       >
         {!item.isOwn && showSender && (
           <Text style={[styles.senderName, { color: colors.text }]}>
-            {item.sender}
+            {item.sender_name}
           </Text>
         )}
         <View
@@ -167,11 +180,11 @@ export default function ChatDetailScreen() {
               { color: item.isOwn ? "#FFFFFF" : colors.text },
             ]}
           >
-            {item.text}
+            {item.body}
           </Text>
         </View>
         <Text style={[styles.messageTime, { color: colors.placeholder }]}>
-          {formatTime(item.timestamp)}
+          {formatTime(item.posted_at)}
         </Text>
       </View>
     );
@@ -240,15 +253,23 @@ export default function ChatDetailScreen() {
 
       {/* Messages */}
       <Animated.View style={[styles.messagesContainer, { opacity: fadeAnim }]}>
-        <FlatList
-          ref={flatListRef}
-          data={messages}
-          renderItem={renderMessage}
-          keyExtractor={(item) => item.id}
-          style={styles.messagesList}
-          contentContainerStyle={styles.messagesContent}
-          showsVerticalScrollIndicator={false}
-        />
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <Text style={[styles.loadingText, { color: colors.text }]}>
+              読み込み中...
+            </Text>
+          </View>
+        ) : (
+          <FlatList
+            ref={flatListRef}
+            data={messages}
+            renderItem={renderMessage}
+            keyExtractor={(item) => item.chat_id.toString()}
+            style={styles.messagesList}
+            contentContainerStyle={styles.messagesContent}
+            showsVerticalScrollIndicator={false}
+          />
+        )}
       </Animated.View>
 
       {/* Input */}
@@ -430,5 +451,14 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     justifyContent: "center",
     alignItems: "center",
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    fontSize: 16,
+    opacity: 0.7,
   },
 });

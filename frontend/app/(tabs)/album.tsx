@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -15,117 +15,142 @@ import { router } from "expo-router";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
-
-interface Album {
-  id: string;
-  title: string;
-  photoCount: number;
-  sharedWithCount: number;
-  coverImage: string;
-}
-
-interface User {
-  id: string;
-  name: string;
-  username: string;
-  selected: boolean;
-}
+import {
+  apiClient,
+  withUserId,
+  getAlbums,
+  Album as ApiAlbum,
+} from "@/services/api-client";
 
 export default function AlbumScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "light"];
+  const [albums, setAlbums] = useState<ApiAlbum[]>([]);
+  const [loading, setLoading] = useState(true);
   const [createAlbumVisible, setCreateAlbumVisible] = useState(false);
   const [albumTitle, setAlbumTitle] = useState("");
-  const [selectedUsers, setSelectedUsers] = useState<User[]>([
-    { id: "1", name: "田中さん", username: "@tanaka123", selected: false },
-    { id: "2", name: "佐藤さん", username: "@sato_san", selected: false },
-    { id: "3", name: "山田さん", username: "@yamada_y", selected: false },
-    { id: "4", name: "鈴木さん", username: "@suzuki_s", selected: false },
-    { id: "5", name: "高橋さん", username: "@takahashi_t", selected: false },
-    { id: "6", name: "伊藤さん", username: "@ito_i", selected: false },
-    { id: "7", name: "渡辺さん", username: "@watanabe_w", selected: false },
-    { id: "8", name: "中村さん", username: "@nakamura_n", selected: false },
-    { id: "9", name: "小林さん", username: "@kobayashi_k", selected: false },
-    { id: "10", name: "加藤さん", username: "@kato_k", selected: false },
-  ]);
 
-  const albums: Album[] = [
-    {
-      id: "1",
-      title: "夏の思い出",
-      photoCount: 12,
-      sharedWithCount: 3,
-      coverImage: "https://picsum.photos/200/200?random=1",
-    },
-    {
-      id: "2",
-      title: "カフェ巡り",
-      photoCount: 8,
-      sharedWithCount: 2,
-      coverImage: "https://picsum.photos/200/200?random=2",
-    },
-    {
-      id: "3",
-      title: "美術館巡り",
-      photoCount: 5,
-      sharedWithCount: 3,
-      coverImage: "https://picsum.photos/200/200?random=3",
-    },
-  ];
+  // アルバム一覧を取得する関数
+  const fetchAlbums = async () => {
+    try {
+      const data = await getAlbums();
+      console.log("Albums API response:", data);
+      if (data) {
+        // データの構造を確認
+        console.log("Albums data structure:", JSON.stringify(data, null, 2));
 
-  const toggleUserSelection = (userId: string) => {
-    setSelectedUsers((users) =>
-      users.map((user) =>
-        user.id === userId ? { ...user, selected: !user.selected } : user
-      )
-    );
+        // APIレスポンスのキー名を正規化（albam_id -> album_id）
+        const normalizedData = data.map((album: any) => ({
+          ...album,
+          album_id: album.album_id || album.albam_id, // タイポ対応
+        }));
+
+        console.log("Normalized albums:", normalizedData);
+        setAlbums(normalizedData);
+      } else {
+        console.error("Failed to fetch albums: data is null");
+      }
+    } catch (error) {
+      console.error("Error fetching albums:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const getSelectedCount = () =>
-    selectedUsers.filter((user) => user.selected).length;
+  useEffect(() => {
+    fetchAlbums();
+  }, []);
 
-  const handleCreateAlbum = () => {
-    if (albumTitle.trim()) {
-      // TODO: アルバム作成ロジックを実装
+  useEffect(() => {
+    console.log("Albums state changed:", albums);
+    console.log("Albums length:", albums.length);
+  }, [albums]);
+
+  const handleCreateAlbum = async () => {
+    if (!albumTitle.trim()) return;
+
+    try {
+      const result = await withUserId(async (userId) => {
+        return apiClient.post("/api/album", {
+          user_id: userId,
+          title: albumTitle.trim(),
+        });
+      });
+
+      if (result.error) {
+        console.error("Failed to create album:", result.error);
+        return;
+      }
+
+      // アルバム一覧を再取得
+      await fetchAlbums();
+
+      // モーダルを閉じてリセット
       setCreateAlbumVisible(false);
       setAlbumTitle("");
-      setSelectedUsers((users) =>
-        users.map((user) => ({ ...user, selected: false }))
-      );
+    } catch (error) {
+      console.error("Error creating album:", error);
     }
   };
 
   const isCreateEnabled = albumTitle.trim().length > 0;
 
-  const handleAlbumPress = (album: Album) => {
+  const handleAlbumPress = (album: ApiAlbum) => {
     // アルバム詳細画面への遷移
-    router.push({
-      pathname: "/album/[id]",
-      params: { id: album.id },
-    });
+    const albumId = album.album_id || (album as any).albam_id;
+    if (albumId) {
+      router.push({
+        pathname: "/album/[id]",
+        params: { id: albumId.toString() },
+      });
+    } else {
+      console.error("Album ID is undefined:", album);
+    }
   };
 
-  const renderAlbumCard = ({ item }: { item: Album }) => (
-    <TouchableOpacity
-      style={styles.albumCard}
-      onPress={() => handleAlbumPress(item)}
-    >
-      <View style={styles.albumImageContainer}>
-        <Image source={{ uri: item.coverImage }} style={styles.albumImage} />
-        <View style={styles.photoCountBadge}>
-          <IconSymbol name="photo" size={12} color="white" />
-          <Text style={styles.photoCountText}>{item.photoCount}</Text>
+  const renderAlbumCard = ({ item }: { item: ApiAlbum }) => {
+    console.log("Rendering album card for item:", item);
+
+    // データの安全性をチェック（albam_idのタイポにも対応）
+    const albumId = item.album_id || (item as any).albam_id;
+    if (!item || !albumId) {
+      console.warn("Invalid album data:", item);
+      return null;
+    }
+
+    console.log("Album card will render for:", item.title);
+
+    return (
+      <TouchableOpacity
+        style={styles.albumCard}
+        onPress={() => handleAlbumPress(item)}
+      >
+        <View style={styles.albumImageContainer}>
+          <Image
+            source={{ uri: item.last_uploaded_image_url }}
+            style={styles.albumImage}
+          />
+          <View style={styles.photoCountBadge}>
+            <IconSymbol name="photo" size={12} color="white" />
+            <Text style={styles.photoCountText}>{item.image_num || 0}</Text>
+          </View>
         </View>
-      </View>
-      <View style={styles.albumInfo}>
-        <Text style={styles.albumTitle}>{item.title}</Text>
-        <View style={styles.sharedInfo}>
-          <IconSymbol name="person.2" size={16} color={colors.textSecondary} />
-          <Text style={styles.sharedText}>{item.sharedWithCount}人で共有</Text>
+        <View style={styles.albumInfo}>
+          <Text style={styles.albumTitle}>{item.title || "名前なし"}</Text>
+          <View style={styles.sharedInfo}>
+            <IconSymbol
+              name="person.2"
+              size={16}
+              color={colors.textSecondary}
+            />
+            <Text style={styles.sharedText}>
+              {item.shared_user_num || 0}人で共有
+            </Text>
+          </View>
         </View>
-      </View>
-    </TouchableOpacity>
-  );
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <SafeAreaView
@@ -165,9 +190,18 @@ export default function AlbumScreen() {
       <FlatList
         style={styles.content}
         showsVerticalScrollIndicator={false}
-        data={albums}
+        data={albums.filter((album) => {
+          console.log("Filtering album:", album);
+          const albumId = album.album_id || (album as any).albam_id;
+          const isValid = album && albumId;
+          console.log("Album is valid:", isValid);
+          return isValid;
+        })}
         renderItem={renderAlbumCard}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => {
+          const albumId = item.album_id || (item as any).albam_id;
+          return albumId?.toString() || `album-${Math.random()}`;
+        }}
         numColumns={2}
         columnWrapperStyle={styles.albumRow}
         ListHeaderComponent={
@@ -189,7 +223,7 @@ export default function AlbumScreen() {
                   { backgroundColor: colors.background },
                 ]}
               >
-                <Text style={styles.statNumber}>3</Text>
+                <Text style={styles.statNumber}>{albums.length}</Text>
                 <Text
                   style={[styles.statLabel, { color: colors.textSecondary }]}
                 >
@@ -203,7 +237,10 @@ export default function AlbumScreen() {
                 ]}
               >
                 <Text style={[styles.statNumber, { color: "#f6339a" }]}>
-                  25
+                  {albums.reduce(
+                    (total, album) => total + (album.image_num || 0),
+                    0
+                  )}
                 </Text>
                 <Text
                   style={[styles.statLabel, { color: colors.textSecondary }]}
@@ -217,7 +254,12 @@ export default function AlbumScreen() {
                   { backgroundColor: colors.background },
                 ]}
               >
-                <Text style={[styles.statNumber, { color: "#2b7fff" }]}>8</Text>
+                <Text style={[styles.statNumber, { color: "#2b7fff" }]}>
+                  {albums.reduce(
+                    (total, album) => total + (album.shared_user_num || 0),
+                    0
+                  )}
+                </Text>
                 <Text
                   style={[styles.statLabel, { color: colors.textSecondary }]}
                 >
@@ -226,13 +268,21 @@ export default function AlbumScreen() {
               </View>
             </View>
 
+            {loading && (
+              <View style={styles.statCard}>
+                <Text style={[styles.statNumber, { color: colors.text }]}>
+                  読み込み中...
+                </Text>
+              </View>
+            )}
+
             {/* Albums Section Header */}
             <View style={styles.sectionHeader}>
               <Text style={[styles.sectionTitle, { color: colors.text }]}>
                 アルバム一覧
               </Text>
               <View style={styles.albumCountBadge}>
-                <Text style={styles.albumCountText}>3個</Text>
+                <Text style={styles.albumCountText}>{albums.length}個</Text>
               </View>
             </View>
           </View>
@@ -291,83 +341,6 @@ export default function AlbumScreen() {
                 value={albumTitle}
                 onChangeText={setAlbumTitle}
               />
-            </View>
-
-            {/* Photo Upload Section */}
-            <View style={styles.inputSection}>
-              <Text style={[styles.inputLabel, { color: colors.text }]}>
-                写真をアップロード
-              </Text>
-              <TouchableOpacity
-                style={[
-                  styles.uploadButton,
-                  {
-                    backgroundColor: colors.background,
-                    borderColor: colors.border,
-                  },
-                ]}
-              >
-                <IconSymbol name="photo" size={16} color={colors.text} />
-                <Text style={[styles.uploadButtonText, { color: colors.text }]}>
-                  写真を追加
-                </Text>
-              </TouchableOpacity>
-              <Text
-                style={[styles.uploadStatus, { color: colors.textSecondary }]}
-              >
-                0枚の写真を追加しました
-              </Text>
-            </View>
-
-            {/* User Selection */}
-            <View style={styles.inputSection}>
-              <Text style={[styles.inputLabel, { color: colors.text }]}>
-                共有するユーザー
-              </Text>
-              <View
-                style={[
-                  styles.userListContainer,
-                  { borderColor: colors.border },
-                ]}
-              >
-                <ScrollView
-                  style={styles.userList}
-                  showsVerticalScrollIndicator={true}
-                  nestedScrollEnabled={true}
-                >
-                  {selectedUsers.map((item) => (
-                    <TouchableOpacity
-                      key={item.id}
-                      style={styles.userItem}
-                      onPress={() => toggleUserSelection(item.id)}
-                    >
-                      <View
-                        style={[
-                          styles.checkbox,
-                          item.selected && styles.checkboxSelected,
-                        ]}
-                      >
-                        {item.selected && (
-                          <IconSymbol
-                            name="checkmark"
-                            size={12}
-                            color={colors.tint}
-                          />
-                        )}
-                      </View>
-                      <View style={styles.userInfo}>
-                        <Text style={styles.userName}>{item.name}</Text>
-                        <Text style={styles.userUsername}>{item.username}</Text>
-                      </View>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-              <Text
-                style={[styles.selectedCount, { color: colors.textSecondary }]}
-              >
-                {getSelectedCount()}人選択中
-              </Text>
             </View>
           </ScrollView>
 
@@ -660,56 +633,6 @@ const styles = StyleSheet.create({
     fontWeight: "400",
   },
   uploadStatus: {
-    fontSize: 14,
-    marginTop: 8,
-  },
-  userListContainer: {
-    borderWidth: 1,
-    borderColor: "#E9ECEF",
-    borderRadius: 12,
-    maxHeight: 250,
-    minHeight: 150,
-    marginVertical: 8,
-  },
-  userList: {
-    flex: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  userItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 6,
-    gap: 12,
-  },
-  checkbox: {
-    width: 16,
-    height: 16,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: "rgba(0, 0, 0, 0.1)",
-    backgroundColor: "#f3f3f5",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  checkboxSelected: {
-    backgroundColor: "#e8f4ff",
-    borderColor: "#2b7fff",
-  },
-  userInfo: {
-    flex: 1,
-  },
-  userName: {
-    fontSize: 15,
-    fontWeight: "400",
-    color: "#364153",
-    marginBottom: 1,
-  },
-  userUsername: {
-    fontSize: 13,
-    color: "#6a7282",
-  },
-  selectedCount: {
     fontSize: 14,
     marginTop: 8,
   },

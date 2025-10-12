@@ -1,85 +1,127 @@
-import React from "react";
-import { View, Text, StyleSheet, Image, ActivityIndicator, Pressable, Platform } from "react-native";
+import React, { useState } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Switch,
+  Image,
+  Modal,
+  TextInput,
+  Alert,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useAuth } from "@/hooks/useAuth";
-import { useUserProfile } from "@/hooks/useUserProfile";
+import { useColorScheme } from "@/hooks/use-color-scheme";
+import { Colors } from "@/constants/theme";
+import { IconSymbol } from "@/components/ui/icon-symbol";
+import { useUserId } from "@/hooks/use-user-id";
+import { removeUserId } from "@/utils/user-storage";
+import { router } from "expo-router";
+import { BackHandler } from "react-native";
+import { appEvents, APP_EVENTS } from "@/utils/app-events";
 
 export default function SettingsScreen() {
-  const { user, loading, error, signInWithGoogle, signOut } = useAuth();
-  const { profile, loading: profileLoading } = useUserProfile(user?.uid);
+  const colorScheme = useColorScheme();
+  const { userId, loading, error } = useUserId();
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [notifications, setNotifications] = useState({
+    proposals: true,
+    messages: true,
+    friendRequests: true,
+    reminders: false,
+  });
 
-  const onPressSignIn = async () => {
-    await signInWithGoogle();
+  const [userProfile, setUserProfile] = useState({
+    name: "山田太郎",
+    bio: "こんにちは！友達と楽しい時間を過ごすのが大好きです。カフェ巡りや映画鑑賞が趣味です。",
+    avatar: null,
+  });
+
+  const handleLogout = () => {
+    Alert.alert("ログアウト", "本当にログアウトしますか？", [
+      { text: "キャンセル", style: "cancel" },
+      {
+        text: "ログアウト",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await removeUserId();
+            // ログアウトイベントを送信してルートレイアウトに状態更新を促す
+            appEvents.emit(APP_EVENTS.USER_LOGOUT);
+            Alert.alert(
+              "ログアウト完了",
+              "ログアウトしました。初回セットアップ画面に戻ります。"
+            );
+          } catch (error) {
+            console.error("ログアウトに失敗しました:", error);
+            Alert.alert("エラー", "ログアウトに失敗しました");
+          }
+        },
+      },
+    ]);
   };
 
-  const onPressSignOut = async () => {
-    await signOut();
-  };
-
-  return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>設定</Text>
+  const NotificationToggle = ({
+    label,
+    description,
+    value,
+    onValueChange,
+  }: {
+    label: string;
+    description: string;
+    value: boolean;
+    onValueChange: (value: boolean) => void;
+  }) => (
+    <View style={styles.notificationItem}>
+      <View style={styles.notificationContent}>
+        <Text
+          style={[
+            styles.notificationLabel,
+            { color: Colors[colorScheme ?? "light"].text },
+          ]}
+        >
+          {label}
+        </Text>
+        <Text style={styles.notificationDescription}>{description}</Text>
       </View>
-      <View style={styles.content}>
-        {loading ? (
-          <ActivityIndicator size="large" color="#4C6EF5" />
-        ) : user ? (
-          <View style={styles.card}>
-            <View style={styles.row}>
-              {user.photoURL ? (
-                <Image source={{ uri: user.photoURL }} style={styles.avatar} />
-              ) : (
-                <View style={[styles.avatar, styles.avatarFallback]}>
-                  <Text style={styles.avatarFallbackText}>
-                    {user.displayName?.[0]?.toUpperCase() || "U"}
-                  </Text>
-                </View>
-              )}
-              <View style={{ flex: 1 }}>
-                <Text style={styles.name}>{user.displayName || "Signed in user"}</Text>
-                <Text style={styles.email}>{user.email}</Text>
-              </View>
-            </View>
+      <Switch
+        value={value}
+        onValueChange={onValueChange}
+        trackColor={{ false: "#f4f3f4", true: "#2b7fff" }}
+        thumbColor={value ? "#ffffff" : "#ffffff"}
+      />
+    </View>
+  );
 
-            <View style={styles.divider} />
-
-            <View style={styles.infoRow}> 
-              <Text style={styles.infoLabel}>UID</Text>
-              <Text style={styles.infoValue} numberOfLines={1}>{user.uid}</Text>
-            </View>
-            <View style={styles.infoRow}> 
-              <Text style={styles.infoLabel}>Username</Text>
-              {profileLoading ? (
-                <ActivityIndicator size="small" />
-              ) : (
-                <Text style={styles.infoValue}>{profile?.username ?? "未設定"}</Text>
-              )}
-            </View>
-
-            <View style={{ height: 16 }} />
-
-            <Pressable
-              onPress={onPressSignOut}
-              style={({ pressed }) => [styles.button, styles.signOutButton, pressed && styles.buttonPressed]}
-            >
-              <Text style={styles.buttonText}>サインアウト</Text>
-            </Pressable>
-          </View>
-        ) : (
-          <View style={styles.card}>
-            <Text style={styles.placeholderText}>サインインして機能を利用できます。</Text>
-            {error ? <Text style={styles.errorText}>{String(error?.message || error)}</Text> : null}
-            <View style={{ height: 16 }} />
-            <Pressable
-              disabled={loading}
-              onPress={onPressSignIn}
-              style={({ pressed }) => [styles.button, styles.signInButton, (pressed || loading) && styles.buttonPressed]}
-            >
-              <Text style={[styles.buttonText, { color: "#fff" }]}>Google でサインイン</Text>
-            </Pressable>
-          </View>
-        )}
+  const SettingsButton = ({
+    icon,
+    title,
+    onPress,
+    style,
+  }: {
+    icon: any;
+    title: string;
+    onPress: () => void;
+    style?: any;
+  }) => (
+    <TouchableOpacity style={[styles.settingsButton, style]} onPress={onPress}>
+      <View style={styles.buttonContent}>
+        <View style={[styles.iconContainer, style?.iconContainer]}>
+          <IconSymbol
+            name={icon as any}
+            size={20}
+            color={style?.iconColor || Colors[colorScheme ?? "light"].text}
+          />
+        </View>
+        <Text
+          style={[
+            styles.buttonText,
+            { color: Colors[colorScheme ?? "light"].text },
+          ]}
+        >
+          {title}
+        </Text>
       </View>
       <IconSymbol
         name="chevron.right"
@@ -161,6 +203,14 @@ export default function SettingsScreen() {
                 ]}
               >
                 {userProfile.name}
+              </Text>
+              <Text style={styles.profileUserId}>
+                ユーザーID:{" "}
+                {loading
+                  ? "読み込み中..."
+                  : error
+                  ? "エラー"
+                  : userId || "未設定"}
               </Text>
               <Text style={styles.profileBio} numberOfLines={2}>
                 {userProfile.bio}
@@ -585,6 +635,11 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     marginBottom: 4,
   },
+  profileUserId: {
+    fontSize: 12,
+    color: "#6a7282",
+    marginBottom: 4,
+  },
   profileBio: {
     fontSize: 14,
     color: "#6a7282",
@@ -713,72 +768,79 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     flex: 1,
-    padding: 20,
+    paddingHorizontal: 24,
+    paddingTop: 16,
   },
-  card: {
-    width: "100%",
-    backgroundColor: "#fff",
+  formSection: {
+    marginBottom: 24,
+  },
+  formLabel: {
+    fontSize: 14,
+    fontWeight: "500",
+    marginBottom: 8,
+  },
+  avatarEditContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  editAvatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    marginRight: 16,
+  },
+  changePhotoButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "white",
     borderRadius: 16,
-    padding: 20,
-    ...(Platform.select({
-      web: { boxShadow: "0 2px 8px rgba(0,0,0,0.08)" },
-      default: {
-        shadowColor: "#000",
-        shadowOpacity: 0.08,
-        shadowRadius: 8,
-        shadowOffset: { width: 0, height: 2 },
-        elevation: 2,
-      },
-    }) as any),
+    borderWidth: 1.33,
+    borderColor: "rgba(0,0,0,0.1)",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 8,
   },
-  row: {
+  changePhotoText: {
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  textInput: {
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    fontSize: 16,
+    minHeight: 36,
+  },
+  facePhotoContainer: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    marginBottom: 8,
   },
-  avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: "#dee2e6",
-  },
-  avatarFallback: {
-    alignItems: "center",
+  facePhotoPlaceholder: {
+    width: 96,
+    height: 96,
+    borderRadius: 16,
+    backgroundColor: "#f3f4f6",
     justifyContent: "center",
+    alignItems: "center",
+    marginRight: 16,
   },
-  avatarFallbackText: {
-    fontWeight: "700",
-    color: "#495057",
-  },
-  name: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#212529",
-  },
-  email: {
-    fontSize: 14,
-    color: "#495057",
-  },
-  divider: {
-    height: 1,
-    backgroundColor: "#e9ecef",
-    marginVertical: 16,
-  },
-  infoRow: {
+  uploadButton: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    gap: 16,
+    backgroundColor: "white",
+    borderRadius: 16,
+    borderWidth: 1.33,
+    borderColor: "rgba(0,0,0,0.1)",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 8,
   },
-  infoLabel: {
+  uploadButtonText: {
     fontSize: 14,
-    color: "#495057",
-  },
-  infoValue: {
-    fontSize: 14,
-    color: "#212529",
-    flex: 1,
-    textAlign: "right",
+    fontWeight: "500",
   },
   textArea: {
     borderRadius: 14,
@@ -831,24 +893,5 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 14,
     fontWeight: "500",
-  },
-  button: {
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: "center",
-  },
-  buttonPressed: {
-    opacity: 0.8,
-  },
-  signInButton: {
-    backgroundColor: "#4C6EF5",
-  },
-  signOutButton: {
-    backgroundColor: "#f1f3f5",
-  },
-  buttonText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#212529",
   },
 });

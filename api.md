@@ -29,7 +29,8 @@ GET
         location: string,
         creator_id: int,
         created_at: datetime,
-        deadline_at: datetime
+        deadline_at: datetime,
+        status: enum,
         participants: [
             {
                 user_id: int,
@@ -46,6 +47,18 @@ GET
 
 ユーザーに提案された提案をすべて取得。
 (締切日を超えたもの、成立したもの、不成立のものは除く)
+```
+
+```
+UPDATE
+/api/proposal/[proposal_id]
+{
+    user_id: int,
+    status: enum
+},
+{
+    とくになし
+}
 ```
 
 ```
@@ -163,14 +176,14 @@ POST
 
 ```
 GET
-/api/albam
+/api/album
 {
     user_id: int,
-    oldest_albam_id: int/null
+    oldest_album_id: int/null
 },
 [
     {
-        albam_id: int,
+        album_id: int,
         title: string,
         last_uploaded_image_url: string,
         image_num: int,
@@ -179,12 +192,12 @@ GET
     ...
 ]
 新しいアルバムが上に来るように。
-oldest_albam_id以前のチャットを10件ずつ取得。
+oldest_album_id以前のチャットを10件ずつ取得。
 ```
 
 ```
 POST
-/api/albam
+/api/album
 {
     user_id: int,
     title: string
@@ -197,7 +210,7 @@ POST
 
 ```
 GET
-/api/albam/[albam_id]
+/api/album/[album_id]
 {
     user_id: int,
     oldest_image_id: int/null
@@ -216,7 +229,7 @@ oldest_image_id以前の写真を30件ずつ取得。
 
 ```
 POST
-/api/albam/[albam_id]
+/api/album/[album_id]
 {
     photo: binary[]
 },
@@ -228,7 +241,7 @@ POST
 
 ```
 UPDATE
-/api/albam/[albam_id]
+/api/album/[album_id]
 {
     title: string
     shared_user_ids: string[]
@@ -318,7 +331,7 @@ POST
     ...
 ]
 新しいアルバムが上に来るように。
-oldest_albam_id以前のチャットを10件ずつ取得。
+oldest_album_id以前のチャットを10件ずつ取得。
 ```
 
 ```
