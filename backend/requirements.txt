@@ -4,3 +4,6 @@ psycopg[binary]==3.1.19
 sqlalchemy==2.0.32
 uvicorn==0.30.6
 pymysql==1.1.1
+httpx
+numpy
+python-multipart

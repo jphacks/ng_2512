@@ -52,3 +52,6 @@ def _build_database_url() -> str:
 
 DATABASE_URL = _build_database_url()
 DATABASE_ECHO = _bool_env("DATABASE_ECHO", default=False)
+
+
+AI_SERVER_URL = _clean_env("AI_SERVER_URL") or "http://localhost:8000"

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
@@ -9,6 +10,7 @@ import secrets
 from pathlib import Path
 from typing import Iterable, Iterator, List, Sequence
 
+import numpy as np
 from sqlalchemy import (
     JSON,
     Date,
@@ -27,6 +29,7 @@ from sqlalchemy.engine import make_url
 from sqlalchemy import inspect
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 
+from . import ai_service
 from .config import DATABASE_ECHO, DATABASE_URL
 
 
@@ -115,7 +118,7 @@ class Proposal(Base):
     location: Mapped[str | None] = mapped_column(String, nullable=True)
     creator_id: Mapped[int] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    deadline_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    deadline_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class ProposalParticipant(Base):
@@ -989,3 +992,43 @@ def _initialize_sqlite_schema() -> None:
 
 
 _initialize_sqlite_schema()
+
+
+# --- Face Matching queries --------------------------------------------------
+
+def _cosine_similarity(v1: np.ndarray, v2: np.ndarray) -> float:
+    """Calculates the cosine similarity between two vectors."""
+    return np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2))
+
+
+async def find_user_by_face_embedding(
+    session: Session,
+    target_embedding: list[float],
+    confidence_threshold: float = 0.8,
+) -> tuple[User | None, float]:
+    """Finds the user with the most similar face embedding."""
+    all_users = session.execute(select(User).where(User.face_asset_url.isnot(None))).scalars().all()
+    if not all_users:
+        return None, 0.0
+
+    # Fetch all embeddings in parallel
+    tasks = [ai_service.generate_embedding_from_url(user.face_asset_url) for user in all_users if user.face_asset_url]
+    user_embeddings = await asyncio.gather(*tasks)
+
+    best_match_user = None
+    highest_similarity = -1.0
+    target_vector = np.array(target_embedding)
+
+    for user, embedding in zip(all_users, user_embeddings):
+        if embedding is None:
+            continue
+
+        similarity = _cosine_similarity(target_vector, np.array(embedding))
+        if similarity > highest_similarity:
+            highest_similarity = similarity
+            best_match_user = user
+
+    if best_match_user and highest_similarity >= confidence_threshold:
+        return best_match_user, highest_similarity
+    else:
+        return None, 0.0

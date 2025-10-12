@@ -5,12 +5,12 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import List
 
-from fastapi import Body, Depends, FastAPI, HTTPException, Path, Query, status
+from fastapi import Body, Depends, FastAPI, HTTPException, Path, Query, status, UploadFile, File
 from pydantic import BaseModel, Field, field_validator, model_validator
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from . import db
+from . import ai_service, db
 
 
 # --- Pydantic schemas ------------------------------------------------------
@@ -308,22 +308,22 @@ def create_app() -> FastAPI:
         response_model=AIProposalResponse,
         tags=["proposal"],
     )
-    def get_ai_proposal(
+    async def get_ai_proposal(
         user_id: int = Query(..., description="User identifier"),
         session: Session = Depends(db.get_session),
     ) -> AIProposalResponse:
+        # Here you could generate a more specific prompt based on user data
+        prompt = f"Create a proposal for user {user_id}"
         try:
-            suggestion = db.fetch_ai_proposal_suggestion(session, user_id)
-        except SQLAlchemyError as exc:  # pragma: no cover - defensive
-            raise HTTPException(
-                status_code=503, detail="Database temporarily unavailable"
-            ) from exc
+            suggestion = await ai_service.get_ai_proposal_suggestion(prompt)
+        except RuntimeError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
 
         return AIProposalResponse(
-            title=suggestion.title,
-            event_date=suggestion.event_date,
-            location=suggestion.location,
-            participant_ids=suggestion.participant_ids,
+            title=suggestion["title"],
+            event_date=suggestion["event_date"],
+            location=suggestion["location"],
+            participant_ids=suggestion["participant_ids"],
         )
 
     # Chats -----------------------------------------------------------------
@@ -455,7 +455,7 @@ def create_app() -> FastAPI:
 
     @app.post(
         "/api/chat/{group_id}/member",
-        status_code=status.HTTP_204_NO_CONTENT,
+        status_code=status.HTTP_200_OK,
         tags=["chat"],
     )
     def add_chat_member(
@@ -585,7 +585,7 @@ def create_app() -> FastAPI:
 
     @app.put(
         "/api/albam/{album_id}",
-        status_code=status.HTTP_204_NO_CONTENT,
+        status_code=status.HTTP_200_OK,
         tags=["album"],
     )
     def update_album(
@@ -606,6 +606,46 @@ def create_app() -> FastAPI:
             raise HTTPException(
                 status_code=503, detail="Database temporarily unavailable"
             ) from exc
+
+    # Face Matching ---------------------------------------------------------
+
+    class FaceMatchResponse(BaseModel):
+        user_id: int | None
+        display_name: str | None
+        match_confidence: float | None
+
+    @app.post("/api/user/match-face", response_model=FaceMatchResponse, tags=["user"])
+    async def match_face(
+        file: UploadFile = File(...),
+        session: Session = Depends(db.get_session),
+    ) -> FaceMatchResponse:
+        try:
+            embedding = await ai_service.generate_embedding_from_image(file)
+            if embedding is None:
+                # 顔が検出されなかった場合
+                return FaceMatchResponse(user_id=None, display_name=None, match_confidence=0.0)
+        except RuntimeError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+        try:
+            # The find_user_by_face_embedding function needs to be implemented in db.py
+            # It should take the embedding and return the user with the closest match.
+            # For now, we'll assume it returns a tuple (user, confidence) or (None, None).
+            matched_user, confidence = await db.find_user_by_face_embedding(session, embedding)
+
+        except SQLAlchemyError as exc: # pragma: no cover - defensive
+            raise HTTPException(
+                status_code=503, detail="Database temporarily unavailable"
+            ) from exc
+
+        if matched_user:
+            return FaceMatchResponse(
+                user_id=matched_user.id,
+                display_name=matched_user.display_name,
+                match_confidence=confidence,
+            )
+        else:
+            return FaceMatchResponse(user_id=None, display_name=None, match_confidence=None)
 
     return app
 
