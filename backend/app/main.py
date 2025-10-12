@@ -201,6 +201,29 @@ class AlbumUpdateRequest(BaseModel):
         return users
 
 
+class FriendEntry(BaseModel):
+    user_id: int
+    account_id: str
+    display_name: str
+    icon_asset_url: str | None = None
+    updated_at: datetime | None = None
+
+
+class FriendOverviewResponse(BaseModel):
+    friend: List[FriendEntry] = Field(default_factory=list)
+    friend_requested: List[FriendEntry] = Field(default_factory=list)
+    friend_recommended: List[FriendEntry] = Field(default_factory=list)
+    friend_requesting: List[FriendEntry] = Field(default_factory=list)
+    friend_blocked: List[FriendEntry] = Field(default_factory=list)
+
+
+class FriendSearchResult(BaseModel):
+    user_id: int
+    account_id: str
+    display_name: str
+    icon_asset_url: str | None = None
+
+
 # --- FastAPI factory -------------------------------------------------------
 
 
@@ -472,11 +495,8 @@ def create_app() -> FastAPI:
 
     # Albums ----------------------------------------------------------------
 
-    @app.get(
-        "/api/albam",
-        response_model=list[AlbumListItem],
-        tags=["album"],
-    )
+    @app.get("/api/albam", response_model=list[AlbumListItem], tags=["album"])
+    @app.get("/api/album", response_model=list[AlbumListItem], tags=["album"])
     def list_albums(
         user_id: int = Query(..., description="User identifier"),
         oldest_albam_id: int | None = Query(
@@ -506,11 +526,8 @@ def create_app() -> FastAPI:
             for album in albums
         ]
 
-    @app.post(
-        "/api/albam",
-        status_code=status.HTTP_201_CREATED,
-        tags=["album"],
-    )
+    @app.post("/api/albam", status_code=status.HTTP_201_CREATED, tags=["album"])
+    @app.post("/api/album", status_code=status.HTTP_201_CREATED, tags=["album"])
     def create_album(
         payload: AlbumCreateRequest,
         session: Session = Depends(db.get_session),
@@ -524,11 +541,8 @@ def create_app() -> FastAPI:
 
         return {"albam_id": album_id}
 
-    @app.get(
-        "/api/albam/{album_id}",
-        response_model=list[AlbumPhotoResponse],
-        tags=["album"],
-    )
+    @app.get("/api/albam/{album_id}", response_model=list[AlbumPhotoResponse], tags=["album"])
+    @app.get("/api/album/{album_id}", response_model=list[AlbumPhotoResponse], tags=["album"])
     def get_album_photos(
         album_id: int = Path(..., description="Album identifier"),
         user_id: int = Query(..., description="User identifier"),
@@ -560,11 +574,8 @@ def create_app() -> FastAPI:
             for photo in photos
         ]
 
-    @app.post(
-        "/api/albam/{album_id}",
-        status_code=status.HTTP_201_CREATED,
-        tags=["album"],
-    )
+    @app.post("/api/albam/{album_id}", status_code=status.HTTP_201_CREATED, tags=["album"])
+    @app.post("/api/album/{album_id}", status_code=status.HTTP_201_CREATED, tags=["album"])
     def add_album_photos(
         album_id: int = Path(..., description="Album identifier"),
         payload: AlbumPhotoUploadRequest = Body(...),
@@ -583,11 +594,8 @@ def create_app() -> FastAPI:
 
         return {"image_ids": [photo.image_id for photo in photos]}
 
-    @app.put(
-        "/api/albam/{album_id}",
-        status_code=status.HTTP_200_OK,
-        tags=["album"],
-    )
+    @app.put("/api/albam/{album_id}", status_code=status.HTTP_200_OK, tags=["album"])
+    @app.put("/api/album/{album_id}", status_code=status.HTTP_200_OK, tags=["album"])
     def update_album(
         album_id: int = Path(..., description="Album identifier"),
         payload: AlbumUpdateRequest = Body(...),
@@ -606,6 +614,69 @@ def create_app() -> FastAPI:
             raise HTTPException(
                 status_code=503, detail="Database temporarily unavailable"
             ) from exc
+
+    # Friends ----------------------------------------------------------------
+
+    @app.get(
+        "/api/friend",
+        response_model=FriendOverviewResponse,
+        tags=["friend"],
+    )
+    def list_friends(
+        user_id: int = Query(..., description="User identifier"),
+        session: Session = Depends(db.get_session),
+    ) -> FriendOverviewResponse:
+        try:
+            overview = db.fetch_friend_overview(session, user_id=user_id)
+        except SQLAlchemyError as exc:  # pragma: no cover - defensive
+            raise HTTPException(
+                status_code=503, detail="Database temporarily unavailable"
+            ) from exc
+
+        return FriendOverviewResponse(
+            friend=[FriendEntry(**entry.__dict__) for entry in overview.get("friend", [])],
+            friend_requested=[
+                FriendEntry(**entry.__dict__) for entry in overview.get("friend_requested", [])
+            ],
+            friend_recommended=[
+                FriendEntry(**entry.__dict__) for entry in overview.get("friend_recommended", [])
+            ],
+            friend_requesting=[
+                FriendEntry(**entry.__dict__) for entry in overview.get("friend_requesting", [])
+            ],
+            friend_blocked=[
+                FriendEntry(**entry.__dict__) for entry in overview.get("friend_blocked", [])
+            ],
+        )
+
+    @app.get(
+        "/api/friend/search",
+        response_model=list[FriendSearchResult],
+        tags=["friend"],
+    )
+    def search_friends(
+        input_text: str = Query(..., description="Search keyword"),
+        session: Session = Depends(db.get_session),
+    ) -> list[FriendSearchResult]:
+        if not input_text.strip():
+            return []
+
+        try:
+            matches = db.search_users(session, input_text=input_text)
+        except SQLAlchemyError as exc:  # pragma: no cover - defensive
+            raise HTTPException(
+                status_code=503, detail="Database temporarily unavailable"
+            ) from exc
+
+        return [
+            FriendSearchResult(
+                user_id=entry.user_id,
+                account_id=entry.account_id,
+                display_name=entry.display_name,
+                icon_asset_url=entry.icon_asset_url,
+            )
+            for entry in matches
+        ]
 
     # Face Matching ---------------------------------------------------------
 
@@ -718,4 +789,3 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
-

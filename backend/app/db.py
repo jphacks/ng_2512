@@ -27,7 +27,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.engine import make_url
 from sqlalchemy import inspect
-from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
+from sqlalchemy.orm import DeclarativeBase, Mapped, Session, aliased, mapped_column, sessionmaker
 
 from . import ai_service
 from .config import DATABASE_ECHO, DATABASE_URL
@@ -344,6 +344,17 @@ class AlbumPhotoData:
 
 
 @dataclass
+class FriendEntryData:
+    """Friend relationship payload."""
+
+    user_id: int
+    account_id: str
+    display_name: str
+    icon_asset_url: str | None
+    updated_at: datetime | None
+
+
+@dataclass
 class AIProposalSuggestion:
     """AI proposal suggestion payload."""
 
@@ -388,6 +399,105 @@ def count_pending_friend_requests(session: Session, user_id: int) -> int:
         .where(UserFriendship.status == "requested")
     )
     return session.scalar(stmt) or 0
+
+
+def fetch_friend_overview(session: Session, user_id: int) -> dict[str, list[FriendEntryData]]:
+    """Return categorized friend information for the specified user."""
+    Initiator = aliased(User)
+    Target = aliased(User)
+    rows = session.execute(
+        select(UserFriendship, Initiator, Target)
+        .join(Initiator, Initiator.id == UserFriendship.user_id)
+        .join(Target, Target.id == UserFriendship.friend_user_id)
+        .where(
+            or_(
+                UserFriendship.user_id == user_id,
+                UserFriendship.friend_user_id == user_id,
+            )
+        )
+    ).all()
+
+    buckets: dict[str, list[FriendEntryData]] = {
+        "friend": [],
+        "friend_requested": [],
+        "friend_recommended": [],
+        "friend_requesting": [],
+        "friend_blocked": [],
+    }
+    seen_friend_ids: set[int] = set()
+
+    for friendship, initiator, target in rows:
+        direction = "outgoing" if friendship.user_id == user_id else "incoming"
+        other_user = target if direction == "outgoing" else initiator
+
+        entry = FriendEntryData(
+            user_id=other_user.id,
+            account_id=getattr(other_user, "account_id", "") or "",
+            display_name=getattr(other_user, "display_name", "") or "",
+            icon_asset_url=getattr(other_user, "icon_asset_url", None),
+            updated_at=getattr(friendship, "updated_at", None),
+        )
+
+        status = (friendship.status or "").lower()
+        if status in {"accepted", "friend", "friends"}:
+            if entry.user_id not in seen_friend_ids:
+                buckets["friend"].append(entry)
+                seen_friend_ids.add(entry.user_id)
+            continue
+
+        if status in {"requested", "pending"}:
+            if direction == "incoming":
+                buckets["friend_requested"].append(entry)
+            else:
+                buckets["friend_requesting"].append(entry)
+            continue
+
+        if status in {"blocked", "block"} and direction == "outgoing":
+            buckets["friend_blocked"].append(entry)
+            continue
+
+        if status in {"recommended", "suggested"}:
+            buckets["friend_recommended"].append(entry)
+            continue
+
+        # Default fallback – treat unknown statuses as pending from initiator
+        if direction == "incoming":
+            buckets["friend_requested"].append(entry)
+        else:
+            buckets["friend_requesting"].append(entry)
+
+    return buckets
+
+
+def search_users(session: Session, *, input_text: str, limit: int = 20) -> list[FriendEntryData]:
+    """Search users by account id or display name."""
+    text = (input_text or "").strip()
+    if not text:
+        return []
+
+    pattern = f"%{text}%"
+    users = session.execute(
+        select(User)
+        .where(
+            or_(
+                User.display_name.ilike(pattern),
+                User.account_id.ilike(pattern),
+            )
+        )
+        .order_by(func.lower(User.display_name))
+        .limit(limit)
+    ).scalars().all()
+
+    return [
+        FriendEntryData(
+            user_id=user.id,
+            account_id=user.account_id or "",
+            display_name=user.display_name or "",
+            icon_asset_url=getattr(user, "icon_asset_url", None),
+            updated_at=None,
+        )
+        for user in users
+    ]
 
 
 def count_unread_messages(session: Session, user_id: int) -> int:
