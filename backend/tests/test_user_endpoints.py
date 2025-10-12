@@ -1,39 +1,83 @@
-"""Tests for user management endpoints."""
+"""Integration tests for user management endpoints."""
 
 from __future__ import annotations
 
+import importlib
 import os
 import sys
+from contextlib import contextmanager
+from typing import Generator, Tuple
 
 import pytest
 from fastapi.testclient import TestClient
 
-# Ensure the backend package is importable as `app`
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-if PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, PROJECT_ROOT)
+ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
 
-from app.main import app  # noqa: E402  (import after sys.path tweak)
+
+@contextmanager
+def _override_env(values: dict[str, str]) -> Generator[None, None, None]:
+    previous = {key: os.environ.get(key) for key in values}
+    try:
+        os.environ.update(values)
+        yield
+    finally:
+        for key, value in previous.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+
+
+def _reload_backend_modules() -> Tuple[object, object]:
+    for module_name in ("backend.app.main", "backend.app.db", "backend.app.config"):
+        sys.modules.pop(module_name, None)
+
+    config_module = importlib.import_module("backend.app.config")
+    config_module = importlib.reload(config_module)
+    db_module = importlib.import_module("backend.app.db")
+    db_module = importlib.reload(db_module)
+    app_module = importlib.import_module("backend.app.main")
+    app_module = importlib.reload(app_module)
+    return app_module, db_module
 
 
 @pytest.fixture(scope="module")
-def client() -> TestClient:
-    """Provide a reusable TestClient instance."""
-    return TestClient(app)
+def app_with_db(tmp_path_factory) -> Generator[Tuple[object, object], None, None]:
+    db_dir = tmp_path_factory.mktemp("user_api")
+    db_path = db_dir / "user_tests.sqlite3"
+    env = {
+        "DATABASE_URL": f"sqlite:///{db_path}",
+        "DB_DRIVER": "sqlite",
+        "DB_NAME": str(db_path),
+        "DATABASE_ECHO": "0",
+    }
+    with _override_env(env):
+        app_module, db_module = _reload_backend_modules()
+        try:
+            yield app_module, db_module
+        finally:
+            db_module.engine.dispose()
 
 
-def test_create_user_endpoint(client: TestClient, mocker: pytest.MockFixture) -> None:
-    """Create user endpoint returns created id and forwards uploaded assets."""
-    upload_mock = mocker.patch(
-        "app.ai_service.upload_image",
-        side_effect=["/assets/icon.png", "/assets/face.png"],
-    )
-    create_user_mock = mocker.patch("app.db.create_user", return_value=123)
+@pytest.fixture(scope="module")
+def client(app_with_db) -> TestClient:
+    app_module, _ = app_with_db
+    return TestClient(app_module.app)
 
+
+@pytest.fixture(scope="module")
+def db_module(app_with_db):
+    _, db_module = app_with_db
+    return db_module
+
+
+def test_create_user_endpoint(client: TestClient, db_module) -> None:
     response = client.post(
         "/api/user/create",
         data={
-            "account_id": "acct-001",
+            "account_id": "acct-create",
             "display_name": "Test User",
             "profile_text": "Hello!",
         },
@@ -44,48 +88,62 @@ def test_create_user_endpoint(client: TestClient, mocker: pytest.MockFixture) ->
     )
 
     assert response.status_code == 201
-    assert response.json() == {"user_id": 123}
-    assert upload_mock.await_count == 2
-    create_user_mock.assert_called_once()
-    _, kwargs = create_user_mock.call_args
-    assert kwargs["account_id"] == "acct-001"
-    assert kwargs["display_name"] == "Test User"
-    assert kwargs["profile_text"] == "Hello!"
-    assert kwargs["icon_image"] == "/assets/icon.png"
-    assert kwargs["face_image"] == "/assets/face.png"
+    payload = response.json()
+    user_id = payload["user_id"]
+
+    session = db_module.SessionLocal()
+    try:
+        user = session.get(db_module.User, user_id)
+        assert user is not None
+        assert user.account_id == "acct-create"
+        assert user.display_name == "Test User"
+        assert user.profile_text == "Hello!"
+        assert user.icon_asset_url == "/assets/images/icon.png"
+        assert user.face_asset_url == "/assets/images/face.png"
+    finally:
+        session.close()
 
 
-def test_update_user_endpoint(client: TestClient, mocker: pytest.MockFixture) -> None:
-    """Update user endpoint stores uploads and propagates payload to DB layer."""
-    upload_mock = mocker.patch(
-        "app.ai_service.upload_image",
-        side_effect=["/assets/new-icon.png", "/assets/new-face.png"],
+def test_update_user_endpoint(client: TestClient, db_module) -> None:
+    create_response = client.post(
+        "/api/user/create",
+        data={
+            "account_id": "acct-update",
+            "display_name": "Original User",
+            "profile_text": "Original",
+        },
+        files={
+            "icon_image": ("original-icon.png", b"PNGDATA", "image/png"),
+            "face_image": ("original-face.png", b"PNGDATA", "image/png"),
+        },
     )
-    update_user_mock = mocker.patch("app.db.update_user")
+    create_response.raise_for_status()
+    user_id = create_response.json()["user_id"]
 
     response = client.put(
         "/api/user",
         data={
-            "user_id": "42",
-            "account_id": "acct-001",
+            "user_id": str(user_id),
+            "account_id": "acct-update",
             "display_name": "Updated User",
             "profile_text": "Updated profile",
         },
         files={
-            "icon_image": ("icon.png", b"PNGDATA", "image/png"),
-            "face_image": ("face.png", b"PNGDATA", "image/png"),
+            "icon_image": ("updated-icon.png", b"PNGDATA", "image/png"),
+            "face_image": ("updated-face.png", b"PNGDATA", "image/png"),
         },
     )
 
     assert response.status_code == 200
-    # FastAPI renders a null JSON body for `None` return values
     assert response.json() is None
-    assert upload_mock.await_count == 2
-    update_user_mock.assert_called_once()
-    _, kwargs = update_user_mock.call_args
-    assert kwargs["user_id"] == 42
-    assert kwargs["account_id"] == "acct-001"
-    assert kwargs["display_name"] == "Updated User"
-    assert kwargs["profile_text"] == "Updated profile"
-    assert kwargs["icon_image"] == "/assets/new-icon.png"
-    assert kwargs["face_image"] == "/assets/new-face.png"
+
+    session = db_module.SessionLocal()
+    try:
+        user = session.get(db_module.User, user_id)
+        assert user is not None
+        assert user.display_name == "Updated User"
+        assert user.profile_text == "Updated profile"
+        assert user.icon_asset_url == "/assets/images/updated-icon.png"
+        assert user.face_asset_url == "/assets/images/updated-face.png"
+    finally:
+        session.close()

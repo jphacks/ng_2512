@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Optional
 
 from sqlalchemy.engine import URL
@@ -28,6 +29,19 @@ def _build_database_url() -> str:
     if explicit_url:
         return explicit_url
 
+    driver = _clean_env("DB_DRIVER") or "sqlite"
+    if driver.startswith("sqlite"):
+        database_name = _clean_env("DB_NAME") or "ng_2512.sqlite3"
+        if database_name == ":memory:":
+            database = database_name
+        else:
+            db_path = Path(database_name).expanduser()
+            if not db_path.is_absolute():
+                db_path = Path.cwd() / db_path
+            database = str(db_path)
+        url = URL.create(drivername=driver, database=database)
+        return str(url)
+
     username = _clean_env("USER")
     password = _clean_env("PASSWORD")
     host = _clean_env("DB_HOST") or "localhost"
@@ -37,7 +51,6 @@ def _build_database_url() -> str:
     except ValueError:
         port = None
     database = _clean_env("DB_NAME") or "ng_2512"
-    driver = _clean_env("DB_DRIVER") or "postgresql+psycopg"
 
     url = URL.create(
         drivername=driver,

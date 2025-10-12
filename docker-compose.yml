@@ -6,4 +6,10 @@ services:
     ports:
       - "8000:8000"
     restart: unless-stopped
-
+    environment:
+      UVICORN_LOG_LEVEL: info
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
