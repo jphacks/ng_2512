@@ -303,7 +303,7 @@ GET
 ```
 
 ```
-GET
+POST
 /api/friend/search
 {
     input_text: string
