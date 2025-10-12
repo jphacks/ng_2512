@@ -55,29 +55,87 @@ export default function SetupScreen({ onSetupComplete }: SetupScreenProps) {
   };
 
   const pickIconImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
+    Alert.alert("画像を選択", "アイコン画像の選択方法を選んでください", [
+      {
+        text: "キャンセル",
+        style: "cancel",
+      },
+      {
+        text: "カメラで撮影",
+        onPress: async () => {
+          const { status } = await ImagePicker.requestCameraPermissionsAsync();
+          if (status !== "granted") {
+            Alert.alert("エラー", "カメラの使用許可が必要です");
+            return;
+          }
 
-    if (!result.canceled && result.assets[0]) {
-      updateFormData("icon_image", result.assets[0]);
-    }
+            const result = await ImagePicker.launchCameraAsync({
+              mediaTypes: ImagePicker.MediaTypeOptions.Images,
+              allowsEditing: false,
+              quality: 0.8,
+            });          if (!result.canceled && result.assets[0]) {
+            updateFormData("icon_image", result.assets[0]);
+          }
+        },
+      },
+      {
+        text: "ライブラリから選択",
+        onPress: async () => {
+          const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: false,
+            quality: 0.8,
+          });
+
+          if (!result.canceled && result.assets[0]) {
+            updateFormData("icon_image", result.assets[0]);
+          }
+        },
+      },
+    ]);
   };
 
   const pickFaceImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [3, 4],
-      quality: 0.8,
-    });
+    Alert.alert("写真を選択", "顔写真の選択方法を選んでください", [
+      {
+        text: "キャンセル",
+        style: "cancel",
+      },
+      {
+        text: "カメラで撮影",
+        onPress: async () => {
+          const { status } = await ImagePicker.requestCameraPermissionsAsync();
+          if (status !== "granted") {
+            Alert.alert("エラー", "カメラの使用許可が必要です");
+            return;
+          }
 
-    if (!result.canceled && result.assets[0]) {
-      updateFormData("face_image", result.assets[0]);
-    }
+          const result = await ImagePicker.launchCameraAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: false,
+            quality: 0.8,
+          });
+
+          if (!result.canceled && result.assets[0]) {
+            updateFormData("face_image", result.assets[0]);
+          }
+        },
+      },
+      {
+        text: "ライブラリから選択",
+        onPress: async () => {
+          const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: false,
+            quality: 0.8,
+          });
+
+          if (!result.canceled && result.assets[0]) {
+            updateFormData("face_image", result.assets[0]);
+          }
+        },
+      },
+    ]);
   };
 
   const completeUserSetup = async () => {
