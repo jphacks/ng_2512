@@ -69,11 +69,12 @@ export default function SetupScreen({ onSetupComplete }: SetupScreenProps) {
             return;
           }
 
-            const result = await ImagePicker.launchCameraAsync({
-              mediaTypes: ImagePicker.MediaTypeOptions.Images,
-              allowsEditing: false,
-              quality: 0.8,
-            });          if (!result.canceled && result.assets[0]) {
+          const result = await ImagePicker.launchCameraAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: false,
+            quality: 0.8,
+          });
+          if (!result.canceled && result.assets[0]) {
             updateFormData("icon_image", result.assets[0]);
           }
         },
